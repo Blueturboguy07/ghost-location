@@ -16,7 +16,15 @@
     ],
     "requirements": "Mac (Apple chip or Intel) or Windows x64; USB data cable; iOS 17.4+ or Android 8+. Unsigned release. See tested scope in the guide.",
     "hero_image_url": "https://raw.githubusercontent.com/Blueturboguy07/ghost-location/main/docs/images/ghost-route.png",
-    "mac_signature": "unsigned"
+    "mac_signature": "unsigned",
+    "alternative_to": {
+      "company": "GhostMe",
+      "priceMonthly": 12.95,
+      "priceLabel": "$12.95/mo",
+      "priceDetail": "Monthly subscription",
+      "funding": null,
+      "url": "https://www.getghostme.com/"
+    }
   },
   "answers": {
     "outputType": "desktop_app",
@@ -44,5 +52,6 @@
   },
   "sourceCommit": "cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f",
   "tag": "v0.1.5",
-  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5"
+  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5",
+  "alternativePriceVerifiedAt": "2026-09-13"
 }
