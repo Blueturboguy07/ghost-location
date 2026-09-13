@@ -21,7 +21,11 @@ if (!existsSync(python)) {
   run(bootstrap, ['-m', 'venv', venv]);
 }
 if (!process.argv.includes('--skip-install')) {
-  run(python, ['-m', 'pip', 'install', '-r', 'sidecar/requirements-build.txt']);
+  // Intel Macs build cryptography from source. Link OpenSSL statically so the
+  // frozen app cannot pick up sslpsk's different libcrypto with the same name.
+  run(python, ['-m', 'pip', 'install', '-r', 'sidecar/requirements-build.txt'], {
+    env: { ...process.env, ...(target === 'darwin-x64' ? { OPENSSL_STATIC: '1' } : {}) },
+  });
 }
 const dist = path.join(root, 'resources', 'ios', target);
 const work = path.join(root, 'sidecar', 'build', target);

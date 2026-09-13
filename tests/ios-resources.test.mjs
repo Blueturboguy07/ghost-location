@@ -25,7 +25,12 @@ test('native resource architecture inspection distinguishes Mac CPUs, universal 
 });
 
 test('official Windows x86 ADB is allowed on x64 without weakening the iOS sidecar check', () => {
-  const adb = readFileSync(path.join(process.cwd(), 'resources/adb/win32-x64/adb.exe'));
+  const fixture = Buffer.alloc(128);
+  fixture.write('MZ'); fixture.writeUInt32LE(80, 60);
+  fixture.write('PE\0\0', 80); fixture.writeUInt16LE(0x014c, 84);
+  const adb = process.platform === 'win32'
+    ? readFileSync(path.join(process.cwd(), 'resources/adb/win32-x64/adb.exe'))
+    : fixture;
   assert.equal(supportsArchitecture(adb, 'win32', 'x64'), false);
   assert.equal(supportsArchitecture(adb, 'win32', 'x64', { allowWindowsX86: true }), true);
 });
