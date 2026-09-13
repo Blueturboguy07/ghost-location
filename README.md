@@ -8,6 +8,17 @@ Android adapter.
 Current version: **0.1.5**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
 interface, Android cleanup, Windows packaging, recovery-record, and reconnection changes.
 
+![Ghost following an example road route in Chicago](docs/images/ghost-route.png)
+
+*Route mode in the actual interface, using an example phone and sample Chicago route.*
+
+## Download and install
+
+Get [Ghost 0.1.5 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5).
+Follow the [setup guide](SETUP.md) for Mac → iPhone, Windows → iPhone, Mac → Android, or Windows → Android, or use [Publik's guided install](https://publikhq.com/ghost/install).
+
+The downloads include the phone runtimes. No programming tools or Ghost account are needed. These early releases are unsigned; the guide explains opening them and the limits of current device testing.
+
 ## Features
 
 
@@ -180,8 +191,8 @@ npm run dist
 Build on each target operating system. macOS Apple Silicon, macOS Intel and Windows
 x64 use matching Python sidecars and ADB resources. Windows ARM is not a supported
 release target yet. The packaging check refuses to produce an app with missing
-device runtimes. Unsigned local macOS builds are for development; public trusted
-distribution needs your signing/notarization credentials and Windows signing setup.
+device runtimes. Release installers are unsigned. Signing/notarization credentials are required
+for a trusted macOS launch and a recognized Windows publisher.
 No publishing or repository upload is performed by these commands.
 
 For v0.1.5, a macOS arm64 build produces `Ghost-0.1.5-mac-arm64.dmg` and

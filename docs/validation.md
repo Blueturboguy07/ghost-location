@@ -1,5 +1,20 @@
 # Local validation
 
+## Public 0.1.5 native builds
+
+[GitHub Actions run 34771723845](https://github.com/Blueturboguy07/ghost-location/actions/runs/34771723845) passed on all three native targets at source commit `cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f`:
+
+- Windows x64: bundled runtime preparation, adapter/sidecar tests, and EXE installer.
+- macOS Apple Silicon: bundled runtime preparation, adapter/sidecar tests, DMG and ZIP.
+- macOS Intel: bundled runtime preparation, adapter/sidecar tests, DMG and ZIP.
+
+The Intel build links cryptography's OpenSSL statically to avoid a shared-library collision with sslpsk in the frozen runtime. The Windows x86-ADB unit check uses a PE fixture on Mac and the real Windows binary on Windows. A separate local run passed all 113 tests.
+
+These checks establish native packaging and software behavior, not all four physical USB pairings. Mac → iPhone use has been reported and observed locally; the remaining phone combinations still need physical validation. The public setup guide keeps that distinction explicit.
+
+The Publik screenshot uses the actual renderer with an isolated example phone and a public Chicago OSRM route. It does not contain a user's phone identity or make device commands.
+
+
 ## v0.1.5 route playback — 2026-09-13
 
 | Check | Result |
