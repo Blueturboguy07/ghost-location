@@ -1,0 +1,11 @@
+{
+  "name": "io.appium.settings",
+  "version": "8.0.9",
+  "source": "https://github.com/appium/io.appium.settings",
+  "license": "Apache-2.0",
+  "apkSha256": "bcfc5e6c2547d83beb3202c43c54cd0a0d3fe48511c87e43585db214259e11f8",
+  "notices": [
+    "LICENSE",
+    "NOTICE.txt"
+  ]
+}

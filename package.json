@@ -1,0 +1,86 @@
+{
+  "name": "ghost-location",
+  "version": "0.1.5",
+  "private": true,
+  "description": "Choose a place. Set your phone's location over USB.",
+  "author": "Ghost contributors",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "electron/main.mjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "preview": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "npm run build && electron .",
+    "test": "node --test tests/*.test.mjs",
+    "test:ios-stream": "node scripts/stress-ios-refresh.mjs",
+    "test:renderer-session": "npm run build && node scripts/check-renderer-session.mjs",
+    "test:native": "npm run build && node scripts/smoke-electron.mjs",
+    "runtime:android": "node scripts/prepare-android.mjs",
+    "runtime:ios": "node scripts/build-ios-sidecar.mjs",
+    "runtime:prepare": "node scripts/prepare-runtime.mjs",
+    "pack": "npm run build && node scripts/check-resources.mjs && electron-builder --dir",
+    "dist": "npm run build && node scripts/check-resources.mjs && electron-builder"
+  },
+  "dependencies": {
+    "leaflet": "1.9.4",
+    "lucide": "^0.577.0"
+  },
+  "devDependencies": {
+    "electron": "44.3.0",
+    "electron-builder": "26.15.3",
+    "io.appium.settings": "8.0.9",
+    "playwright": "1.62.1",
+    "vite": "8.3.0"
+  },
+  "build": {
+    "appId": "org.ghostlocation.desktop",
+    "productName": "Ghost",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "backend/**",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/adb/${platform}-${arch}",
+        "to": "adb/${platform}-${arch}"
+      },
+      {
+        "from": "resources/ios/${platform}-${arch}",
+        "to": "ios/${platform}-${arch}"
+      },
+      {
+        "from": "resources/android",
+        "to": "android"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "beforePack": "./scripts/check-resources.mjs",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "artifactName": "Ghost-${version}-${os}-${arch}.${ext}"
+  }
+}

@@ -1,0 +1,91 @@
+name: Build native desktop installers
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            platform: win32
+            arch: x64
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+    env:
+      GHOST_TARGET_PLATFORM: ${{ matrix.platform }}
+      GHOST_TARGET_ARCH: ${{ matrix.arch }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.18.0'
+          architecture: ${{ matrix.arch }}
+          cache: npm
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          # Last 3.12 release with macOS/Windows artifacts in actions/python-versions.
+          python-version: '3.12.10'
+          architecture: ${{ matrix.arch }}
+      - name: Verify native runtime architecture
+        run: node -e "if(process.platform!==process.env.GHOST_TARGET_PLATFORM || process.arch!==process.env.GHOST_TARGET_ARCH) throw new Error('Build host architecture does not match target')"
+      - name: Install locked npm dependencies
+        run: npm ci
+      - name: Prepare bundled phone runtimes
+        run: npm run runtime:prepare
+        env:
+          GHOST_BUILD_PYTHON: ${{ steps.python.outputs.python-path }}
+      - name: Test adapters and sidecar
+        run: npm test
+      - name: Build unsigned installers without publishing
+        run: npm run dist -- --publish never --${{ matrix.arch }}
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Ghost-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+      - name: Upload build provenance and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-${{ matrix.platform }}-${{ matrix.arch }}-${{ github.sha }}
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            resources/adb/**/provenance.json
+            resources/android/provenance.json
+            resources/ios/**/build-info.json
+            resources/ios/**/build-dependencies.txt
+            sidecar/build/**/warn-ghost-ios.txt
+            release/builder-effective-config.yaml

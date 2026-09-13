@@ -1,0 +1,2 @@
+# Runtime license: GPL-3.0-or-later. Tested against this exact API version.
+pymobiledevice3==11.12.4
