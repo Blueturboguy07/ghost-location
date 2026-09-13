@@ -128,3 +128,9 @@ acknowledgement/error handling, cleanup, permission behavior, process terminatio
 and persistent recovery. They do not establish that a particular phone app accepts
 simulated coordinates. Complete `hardware-test-matrix.md` before a public claim of
 verified support across all four host/phone combinations.
+
+## Publik publication check
+
+Ghost is published at [publikhq.com/ghost](https://publikhq.com/ghost), with approved Mac and Windows guides and a pinned 0.1.5 release. The listing, installation pages, and public Iris guide endpoint returned successfully. The direct-install button opens Publik’s existing sign-in gate for anonymous visitors. Public GitHub download endpoints respond successfully; all uploaded SHA-256 digests match the downloaded CI artifacts, and both DMG and ZIP integrity checks pass.
+
+Publik’s existing guide/assembler/submission test selection passed 152 tests. The Ghost renderer rehearsal passed fixed-location heartbeats and route planning/start/pause/resume with no phone adapters loaded. Published guide and listing inputs are preserved in `publik-guide.json` and `publik-listing.json`; retain the app-specific setup and route steps when preparing a later guide version.

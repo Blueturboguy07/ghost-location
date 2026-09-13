@@ -1,0 +1,506 @@
+{
+  "status": "approved",
+  "appName": "Ghost",
+  "appSlug": "ghost",
+  "version": 1,
+  "branches": [
+    {
+      "label": "macOS",
+      "shell": "terminal",
+      "steps": [
+        {
+          "id": "choose-installer",
+          "body": "About This Mac: use arm64 for an Apple chip, or x64 for Intel.",
+          "kind": "check",
+          "title": "Check your computer",
+          "verifierLabel": "You know which installer matches your computer"
+        },
+        {
+          "id": "download",
+          "body": "Choose Ghost-0.1.5-mac-arm64.dmg or Ghost-0.1.5-mac-x64.dmg for your chip.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5",
+          "kind": "open",
+          "title": "Download Ghost 0.1.5",
+          "actionLabel": "Open Ghost downloads",
+          "verifierLabel": "The matching installer finished downloading"
+        },
+        {
+          "id": "locate-download",
+          "body": "Open your Downloads folder and find the Ghost installer.",
+          "kind": "permission",
+          "title": "Find the download",
+          "verifierLabel": "You can see the downloaded file"
+        },
+        {
+          "id": "install-app",
+          "body": "Open the DMG, then drag Ghost into Applications.",
+          "kind": "permission",
+          "title": "Install Ghost",
+          "verifierLabel": "Ghost is installed"
+        },
+        {
+          "id": "unsigned-launch",
+          "body": "If blocked, try Privacy & Security → Open Anyway. For “damaged”, follow the checksum guide.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#download-and-open",
+          "kind": "open",
+          "title": "Open this unsigned release",
+          "actionLabel": "Read launch and checksum help",
+          "verifierLabel": "You have handled any launch warning"
+        },
+        {
+          "id": "first-launch",
+          "body": "Open Ghost from Applications.",
+          "kind": "verify",
+          "title": "Open Ghost",
+          "watch": {
+            "expect": [
+              {
+                "type": "foregroundApp",
+                "bundleId": "org.ghostlocation.desktop"
+              }
+            ]
+          },
+          "verifierLabel": "Ghost launches"
+        },
+        {
+          "id": "choose-configuration",
+          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost’s first-run survey.",
+          "kind": "permission",
+          "title": "Choose your computer and phone",
+          "verifierLabel": "The checklist matches your computer and phone"
+        },
+        {
+          "id": "phone-settings",
+          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options and USB debugging.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#mac--iphone",
+          "kind": "open",
+          "title": "Prepare your phone’s settings",
+          "watch": {
+            "expect": [],
+            "sensitive": true
+          },
+          "actionLabel": "Read all four phone setup paths",
+          "verifierLabel": "You completed the steps for your phone"
+        },
+        {
+          "id": "trust-usb",
+          "body": "Connect an unlocked phone with a data cable. Accept Trust or USB debugging on your phone.",
+          "kind": "permission",
+          "title": "Connect and authorize USB",
+          "watch": {
+            "expect": [],
+            "sensitive": true
+          },
+          "verifierLabel": "Your phone has authorized this computer"
+        },
+        {
+          "id": "finish-onboarding",
+          "body": "Check off your completed setup steps, then click Continue to map.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Continue to map"
+          },
+          "title": "Continue to the map",
+          "watch": {
+            "expect": [
+              {
+                "type": "foregroundApp",
+                "bundleId": "org.ghostlocation.desktop"
+              },
+              {
+                "type": "axElement",
+                "roleLabel": "Fixed location"
+              }
+            ],
+            "sensitive": true
+          },
+          "verifierLabel": "The Ghost map and location controls are visible"
+        },
+        {
+          "id": "prepare-device",
+          "body": "Select the phone in Ghost. If Setup needed appears, click Prepare while online.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Connected phone"
+          },
+          "title": "Prepare the connected phone",
+          "verifierLabel": "Ghost shows your selected phone as Ready"
+        },
+        {
+          "id": "android-mock-provider",
+          "body": "Android only: allow Appium Settings location access and select it as the mock location app.",
+          "kind": "permission",
+          "title": "Check Android’s location helper",
+          "verifierLabel": "Android is ready, or you are using iPhone"
+        },
+        {
+          "id": "select-fixed-point",
+          "body": "Select Fixed location. Search and select a result, drop a map pin, or enter coordinates.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Fixed location"
+          },
+          "title": "Choose a fixed location",
+          "verifierLabel": "The pin marks the place you chose"
+        },
+        {
+          "id": "apply-fixed-point",
+          "body": "Check the phone and pin, then click Set location. A later change uses Update location.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Set location"
+          },
+          "title": "Send the location to your phone",
+          "verifierLabel": "Ghost shows an active session"
+        },
+        {
+          "id": "verify-phone-location",
+          "body": "On the phone, allow map location access and tap current location. Confirm the selected area.",
+          "kind": "verify",
+          "title": "Check the phone’s map",
+          "verifierLabel": "The phone’s map shows your chosen location"
+        },
+        {
+          "id": "restore-before-route",
+          "body": "Click Restore real location. Wait for the phone’s map to refresh.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Restore real location"
+          },
+          "title": "Restore before trying a route",
+          "verifierLabel": "Your phone has returned to its real location"
+        },
+        {
+          "id": "choose-route",
+          "body": "Select Route. Pick each stop, then click Add selected pin to route. Use at least two stops.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Route"
+          },
+          "title": "Add a start and destination",
+          "verifierLabel": "Your start and destination appear in travel order"
+        },
+        {
+          "id": "plan-route",
+          "body": "Click Plan road route. Check the road line and distance before starting. Internet is required.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Plan road route"
+          },
+          "title": "Preview the road route",
+          "verifierLabel": "The planned road line and distance are visible"
+        },
+        {
+          "id": "start-route",
+          "body": "Click Start route · 45 mph. Ghost sends a new route point every second.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Start route · 45 mph"
+          },
+          "title": "Start moving at 45 mph",
+          "watch": {
+            "expect": [
+              {
+                "type": "foregroundApp",
+                "bundleId": "org.ghostlocation.desktop"
+              },
+              {
+                "type": "axElement",
+                "roleLabel": "Pause route"
+              }
+            ],
+            "sensitive": true
+          },
+          "verifierLabel": "Ghost shows Pause route and a moving blue dot"
+        },
+        {
+          "id": "verify-route-on-phone",
+          "body": "Watch the phone’s map. Ghost’s dot shows sent points; it cannot verify what a phone app reads.",
+          "kind": "verify",
+          "title": "Check movement on the phone",
+          "verifierLabel": "You have checked movement in the phone’s map"
+        },
+        {
+          "id": "pause-route",
+          "body": "Pause route holds the last point. Resume route · 45 mph continues along the road.",
+          "kind": "permission",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Pause route"
+          },
+          "title": "Pause and resume",
+          "verifierLabel": "You can pause and resume the route"
+        },
+        {
+          "id": "restore-location",
+          "body": "Click Restore real location, then check the phone’s map before unplugging.",
+          "kind": "verify",
+          "point": {
+            "inApp": "org.ghostlocation.desktop",
+            "descriptor": "Restore real location"
+          },
+          "title": "Restore the real location",
+          "verifierLabel": "Simulation has stopped and the phone shows its real location"
+        },
+        {
+          "id": "recovery-help",
+          "body": "Sleep or unplugging pauses routes. Reconnect the same phone, then Resume; use Restore when done.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#if-something-goes-wrong",
+          "kind": "open",
+          "title": "Know how to recover",
+          "actionLabel": "Open troubleshooting",
+          "verifierLabel": "You know how to reconnect or restore"
+        }
+      ],
+      "target": null,
+      "platform": "macos",
+      "setupSteps": [],
+      "unsupported": null
+    },
+    {
+      "label": "Windows",
+      "shell": "powershell",
+      "steps": [
+        {
+          "id": "choose-installer",
+          "body": "Settings → System → About: this installer needs an x64 Intel/AMD PC.",
+          "kind": "check",
+          "title": "Check your computer",
+          "verifierLabel": "You know which installer matches your computer"
+        },
+        {
+          "id": "download",
+          "body": "Download Ghost-0.1.5-win-x64.exe. The installer includes the phone tools.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5",
+          "kind": "open",
+          "title": "Download Ghost 0.1.5",
+          "actionLabel": "Open Ghost downloads",
+          "verifierLabel": "The matching installer finished downloading"
+        },
+        {
+          "id": "locate-download",
+          "body": "Open your Downloads folder and find the Ghost installer.",
+          "kind": "permission",
+          "title": "Find the download",
+          "verifierLabel": "You can see the downloaded file"
+        },
+        {
+          "id": "install-app",
+          "body": "Open the EXE and follow the installer.",
+          "kind": "permission",
+          "title": "Install Ghost",
+          "verifierLabel": "Ghost is installed"
+        },
+        {
+          "id": "unsigned-launch",
+          "body": "If SmartScreen blocks it, inspect the warning; More info → Run anyway requires your trust.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#download-and-open",
+          "kind": "open",
+          "title": "Open this unsigned release",
+          "actionLabel": "Read launch and checksum help",
+          "verifierLabel": "You have handled any launch warning"
+        },
+        {
+          "id": "first-launch",
+          "body": "Open Ghost from the Start menu.",
+          "kind": "verify",
+          "title": "Open Ghost",
+          "verifierLabel": "Ghost launches"
+        },
+        {
+          "id": "choose-configuration",
+          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost’s first-run survey.",
+          "kind": "permission",
+          "title": "Choose your computer and phone",
+          "verifierLabel": "The checklist matches your computer and phone"
+        },
+        {
+          "id": "windows-usb-driver",
+          "body": "iPhone: install Apple Devices. Android: use your maker’s ADB driver if detection fails.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#choose-your-configuration",
+          "kind": "open",
+          "title": "Check Windows USB support",
+          "actionLabel": "Open Windows phone setup",
+          "verifierLabel": "Your phone has the appropriate Windows USB support"
+        },
+        {
+          "id": "phone-settings",
+          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options and USB debugging.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#windows--iphone",
+          "kind": "open",
+          "title": "Prepare your phone’s settings",
+          "watch": {
+            "expect": [],
+            "sensitive": true
+          },
+          "actionLabel": "Read all four phone setup paths",
+          "verifierLabel": "You completed the steps for your phone"
+        },
+        {
+          "id": "trust-usb",
+          "body": "Connect an unlocked phone with a data cable. Accept Trust or USB debugging on your phone.",
+          "kind": "permission",
+          "title": "Connect and authorize USB",
+          "watch": {
+            "expect": [],
+            "sensitive": true
+          },
+          "verifierLabel": "Your phone has authorized this computer"
+        },
+        {
+          "id": "finish-onboarding",
+          "body": "Check off your completed setup steps, then click Continue to map.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Continue to map"
+          },
+          "title": "Continue to the map",
+          "verifierLabel": "The Ghost map and location controls are visible"
+        },
+        {
+          "id": "prepare-device",
+          "body": "Select the phone in Ghost. If Setup needed appears, click Prepare while online.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Connected phone"
+          },
+          "title": "Prepare the connected phone",
+          "verifierLabel": "Ghost shows your selected phone as Ready"
+        },
+        {
+          "id": "android-mock-provider",
+          "body": "Android only: allow Appium Settings location access and select it as the mock location app.",
+          "kind": "permission",
+          "title": "Check Android’s location helper",
+          "verifierLabel": "Android is ready, or you are using iPhone"
+        },
+        {
+          "id": "select-fixed-point",
+          "body": "Select Fixed location. Search and select a result, drop a map pin, or enter coordinates.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Fixed location"
+          },
+          "title": "Choose a fixed location",
+          "verifierLabel": "The pin marks the place you chose"
+        },
+        {
+          "id": "apply-fixed-point",
+          "body": "Check the phone and pin, then click Set location. A later change uses Update location.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Set location"
+          },
+          "title": "Send the location to your phone",
+          "verifierLabel": "Ghost shows an active session"
+        },
+        {
+          "id": "verify-phone-location",
+          "body": "On the phone, allow map location access and tap current location. Confirm the selected area.",
+          "kind": "verify",
+          "title": "Check the phone’s map",
+          "verifierLabel": "The phone’s map shows your chosen location"
+        },
+        {
+          "id": "restore-before-route",
+          "body": "Click Restore real location. Wait for the phone’s map to refresh.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Restore real location"
+          },
+          "title": "Restore before trying a route",
+          "verifierLabel": "Your phone has returned to its real location"
+        },
+        {
+          "id": "choose-route",
+          "body": "Select Route. Pick each stop, then click Add selected pin to route. Use at least two stops.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Route"
+          },
+          "title": "Add a start and destination",
+          "verifierLabel": "Your start and destination appear in travel order"
+        },
+        {
+          "id": "plan-route",
+          "body": "Click Plan road route. Check the road line and distance before starting. Internet is required.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Plan road route"
+          },
+          "title": "Preview the road route",
+          "verifierLabel": "The planned road line and distance are visible"
+        },
+        {
+          "id": "start-route",
+          "body": "Click Start route · 45 mph. Ghost sends a new route point every second.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Start route · 45 mph"
+          },
+          "title": "Start moving at 45 mph",
+          "verifierLabel": "Ghost shows Pause route and a moving blue dot"
+        },
+        {
+          "id": "verify-route-on-phone",
+          "body": "Watch the phone’s map. Ghost’s dot shows sent points; it cannot verify what a phone app reads.",
+          "kind": "verify",
+          "title": "Check movement on the phone",
+          "verifierLabel": "You have checked movement in the phone’s map"
+        },
+        {
+          "id": "pause-route",
+          "body": "Pause route holds the last point. Resume route · 45 mph continues along the road.",
+          "kind": "permission",
+          "point": {
+            "descriptor": "Pause route"
+          },
+          "title": "Pause and resume",
+          "verifierLabel": "You can pause and resume the route"
+        },
+        {
+          "id": "restore-location",
+          "body": "Click Restore real location, then check the phone’s map before unplugging.",
+          "kind": "verify",
+          "point": {
+            "descriptor": "Restore real location"
+          },
+          "title": "Restore the real location",
+          "verifierLabel": "Simulation has stopped and the phone shows its real location"
+        },
+        {
+          "id": "recovery-help",
+          "body": "Sleep or unplugging pauses routes. Reconnect the same phone, then Resume; use Restore when done.",
+          "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#if-something-goes-wrong",
+          "kind": "open",
+          "title": "Know how to recover",
+          "actionLabel": "Open troubleshooting",
+          "verifierLabel": "You know how to reconnect or restore"
+        }
+      ],
+      "target": null,
+      "platform": "windows",
+      "setupSteps": [],
+      "unsupported": null
+    }
+  ],
+  "outputType": "desktop_app",
+  "reviewNote": "Ghost 0.1.5: native installer checks and an isolated renderer rehearsal; Mac/iPhone use reported. Other physical USB pairings remain unverified. Phone settings, permission prompts and phone-map readings require manual confirmation. Local UI watches do not verify phone GPS.",
+  "sourceRepo": "ghost-location",
+  "sourceOwner": "Blueturboguy07",
+  "sourceCommit": "cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f",
+  "estimatedMinutes": 15,
+  "readmeSectionIds": [
+    "download-and-install",
+    "device-setup",
+    "route-playback"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "listing": {
+    "slug": "ghost",
+    "name": "Ghost",
+    "tagline": "Set a phone location or follow a road route over USB",
+    "category": "Productivity",
+    "platform_badges": [
+      {
+        "os": "macos",
+        "label": "macOS"
+      },
+      {
+        "os": "windows",
+        "label": "Windows"
+      }
+    ],
+    "requirements": "Mac (Apple chip or Intel) or Windows x64; USB data cable; iOS 17.4+ or Android 8+. Unsigned release. See tested scope in the guide.",
+    "hero_image_url": "https://raw.githubusercontent.com/Blueturboguy07/ghost-location/main/docs/images/ghost-route.png",
+    "mac_signature": "unsigned"
+  },
+  "answers": {
+    "outputType": "desktop_app",
+    "platforms": {
+      "macos": true,
+      "windows": true
+    },
+    "appName": "Ghost",
+    "routes": {
+      "macos": {
+        "kind": "signed_download",
+        "assetName": "Ghost-0.1.5-mac-arm64.dmg"
+      },
+      "windows": {
+        "kind": "signed_download",
+        "assetName": "Ghost-0.1.5-win-x64.exe"
+      }
+    },
+    "packageManager": "npm",
+    "extraToolchains": [],
+    "installCommand": "npm ci",
+    "runCommand": "npm run dev",
+    "credentials": [],
+    "permissions": []
+  },
+  "sourceCommit": "cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f",
+  "tag": "v0.1.5",
+  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5"
+}

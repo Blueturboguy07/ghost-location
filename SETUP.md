@@ -17,7 +17,7 @@ On Mac, **Apple menu → About This Mac** identifies the chip. On Windows, look 
 **Mac:** open the DMG, drag **Ghost** into **Applications**, then open it from Applications. The app is unsigned and not notarized. If macOS blocks the launch, check **System Settings → Privacy & Security → Open Anyway**. If it instead reports the app as damaged, first compare the download with `SHA256SUMS.txt` on the release page and download it again if the checksum differs. For a matching download that you choose to trust, the scoped command below removes its quarantine flag; it does not sign the app or verify its safety:
 
 ```sh
-xattr -d com.apple.quarantine /Applications/Ghost.app
+xattr -dr com.apple.quarantine /Applications/Ghost.app
 ```
 
 **Windows:** run the EXE and follow the installer. The release is unsigned. If SmartScreen shows **Windows protected your PC**, inspect the file and publisher warning; use **More info → Run anyway** only if you choose to trust this download. A managed computer may block unsigned apps.
