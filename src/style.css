@@ -424,3 +424,11 @@ dialog[open] { animation: rise .18s ease-out; }
 .route-active .route-provider,
 .route-active:not(.show-saved) .saved-section { display: none; }
 .route-active .route-stops { max-height: 190px; overflow-y: auto; }
+
+.wifi-steps { padding-left: 22px; color: var(--secondary); font-size: 14px; line-height: 1.6; }
+.wifi-steps li + li { margin-top: 10px; }
+.wifi-form { margin-top: 20px; display: grid; gap: 9px; }
+.wifi-form .field-label, .wifi-form .settings-note { margin: 0; }
+.wifi-form .secondary-button { justify-self: start; margin-top: 4px; }
+#wifi-dialog .settings-note { font-size: 14px; line-height: 1.5; }
+#wifi-dialog { background: rgba(248,249,251,.98); }

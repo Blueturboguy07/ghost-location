@@ -48,10 +48,10 @@ test('no-route, HTTP, malformed response and invalid stops fail without a straig
   for (const stops of [null, [], [plan.waypoints[0]], Array(13).fill(plan.waypoints[0]), [{latitude: 91, longitude: 0}, plan.waypoints[1]]]) await assert.rejects(router.plan(stops));
 });
 
-async function fixture(t, platform = 'ios') {
-  const phone = { id: `${platform}:USB123`, serial: 'USB123', platform, name: 'Test phone', connection: 'usb', state: 'ready' };
+async function fixture(t, platform = 'ios', connection = 'usb') {
+  const phone = { id: `${platform}:USB123`, serial: 'USB123', platform, name: 'Test phone', connection, state: 'ready' };
   let timestamp = 0, devices = [phone];
-  const calls = [], data = defaults();
+  const calls = [], data = defaults(); data.preferences.connection = connection;
   const store = {load: async () => structuredClone(data), save: async value => { calls.push(['persist']); Object.assign(data, structuredClone(value)); }};
   const adapter = {status: async () => ({available: true}), list: async () => devices,
     set: async (device, point) => { calls.push(['set', device.id, {...point}]); return {}; },
@@ -64,8 +64,8 @@ async function fixture(t, platform = 'ios') {
   return {c, phone, adapter, calls, data, start, advance: ms => { timestamp += ms; }, disconnect: () => {devices = [];}, reconnect: () => {devices = [phone];}, replace: () => {devices = [{...phone, id: `${platform}:SECOND`, serial: 'SECOND'}];}};
 }
 
-for (const platform of ['ios', 'android']) test(`${platform} route sends one point per second, preserves session, and holds exact endpoint`, async t => {
-  const f = await fixture(t, platform); await f.start();
+for (const connection of ['usb', 'wifi']) for (const platform of ['ios', 'android']) test(`${platform} ${connection} route sends one point per second, preserves session, and holds exact endpoint`, async t => {
+  const f = await fixture(t, platform, connection); await f.start();
   const id = f.c.state.session.id; f.calls.length = 0;
   for (let second = 1; second <= 12; second++) { f.advance(1000); await f.c.tickRoute(); }
   assert.equal(f.c.state.route.status, 'completed');

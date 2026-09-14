@@ -26,6 +26,7 @@ export class Controller extends EventEmitter {
   async init() {
     const saved = await this.store.load();
     Object.assign(this.state, saved, { warning: this.store.warning });
+    for (const adapter of Object.values(this.adapters)) adapter.connection = this.state.preferences.connection === 'wifi' ? 'wifi' : 'usb';
     if (this.state.session) {
       this.state.session.status = 'unknown';
       this.state.session.id ||= randomUUID();
@@ -91,9 +92,9 @@ export class Controller extends EventEmitter {
         this.notify(); return this.snapshot();
       }
       active.status = this.canResume(active) ? 'waiting' : 'unknown';
-      this.pauseRouteMotion('USB disconnected. Resume the route after this phone reconnects.');
+      this.pauseRouteMotion('Phone disconnected. Resume the route after this phone reconnects.');
       active.autoReconnect = this.canResume(active);
-      active.message = active.autoReconnect ? 'USB disconnected. Waiting to reconnect this phone and resume the selected location.' : 'USB disconnected. Connect this phone, then retry the location or restore it.';
+      active.message = active.autoReconnect ? 'Phone disconnected. Waiting to reconnect this phone and resume the selected location.' : 'Phone disconnected. Connect this phone, then retry the location or restore it.';
       this.retryAt = 0;
       await this.persist();
     }
@@ -104,7 +105,7 @@ export class Controller extends EventEmitter {
     const previous = this.state.session;
     if (!previous || !REPLACEABLE_SESSION_STATUSES.has(previous.status)) return false;
     const replacement = this.state.devices.find(device => device.id !== previous.deviceId &&
-      device.connection === 'usb' && USABLE_REPLACEMENT_STATES.has(device.state));
+      (previous.platform === 'ios' || (previous.connection || 'usb') === 'usb' || previous.hardwareId) && ['usb', 'wifi'].includes(device.connection) && USABLE_REPLACEMENT_STATES.has(device.state));
     if (!replacement) return false;
 
     // A recovery record from another phone must not lock the newly connected
@@ -138,7 +139,8 @@ export class Controller extends EventEmitter {
         serial: oldSerial,
         name: previous.deviceName || 'Previous phone',
         platform: previous.platform,
-        connection: 'usb',
+        connection: previous.connection || 'usb',
+        ...(previous.hardwareId ? {hardwareId: previous.hardwareId} : {}),
         state: 'offline',
       };
       try {
@@ -151,10 +153,36 @@ export class Controller extends EventEmitter {
   }
   device(id) {
     if (typeof id !== 'string') throw new Error('Select a connected phone.');
-    const device = this.state.devices.find(d => d.id === id && d.connection === 'usb');
-    if (!device) throw new Error('That phone is no longer connected by USB. Reconnect it and refresh.');
+    const device = this.state.devices.find(d => d.id === id && d.connection === (this.state.preferences.connection || 'usb'));
+    if (!device) throw new Error('That phone is no longer connected. Reconnect it and refresh.');
     if (['unauthorized', 'offline'].includes(device.state)) throw new Error(device.detail || 'Unlock your phone and trust this computer.');
     return device;
+  }
+  async setConnection(connection) {
+    if (!['usb', 'wifi'].includes(connection)) throw new Error('Choose USB or Wi-Fi.');
+    return this.exclusive(async () => {
+      if (this.state.session) throw new Error('Restore the current location before changing connections.');
+      const previous = this.state.preferences.connection;
+      this.state.preferences.connection = connection;
+      try { await this.persist(); } catch (error) { this.state.preferences.connection = previous; throw error; }
+      for (const adapter of Object.values(this.adapters)) adapter.connection = connection;
+      this.state.devices = [];
+      await this.scan();
+    });
+  }
+  async connectWifi(input) {
+    return this.exclusive(async () => {
+      const recoveringAndroid = input?.platform === 'android' && this.state.session?.platform === 'android' && this.state.session?.connection === 'wifi' && REPLACEABLE_SESSION_STATUSES.has(this.state.session?.status);
+      if (this.state.session && !recoveringAndroid) throw new Error('Restore the current location before pairing a phone.');
+      if (input?.platform === 'ios') {
+        const device = this.device(input.deviceId);
+        if (device.platform !== 'ios' || device.connection !== 'usb') throw new Error('Connect and select the iPhone by USB first.');
+        await this.adapters.ios.enableWifi(device);
+      } else if (input?.platform === 'android') {
+        await this.adapters.android.connectWifi(input);
+      } else throw new Error('Choose iPhone or Android.');
+      await this.scan();
+    });
   }
   async prepareDevice(id) {
     return this.exclusive(async () => {
@@ -181,7 +209,7 @@ export class Controller extends EventEmitter {
       this.pauseRouteMotion();
       const recovering = previous && previous.status !== 'active';
       const wasLive = previous && this.canResume(previous);
-      const current = { id: randomUUID(), deviceId: device.id, platform: device.platform, deviceName: device.name, serial: device.serial, ...point, status: 'applying', autoReconnect: Boolean(wasLive), refreshCount: 0, lastRefreshAt: null, message: recovering ? 'Reconnecting this phone and sending the new location…' : 'Sending the selected location to your phone…', startedAt: new Date(this.now()).toISOString() };
+      const current = { id: randomUUID(), deviceId: device.id, platform: device.platform, deviceName: device.name, serial: device.serial, connection: device.connection, ...(device.hardwareId ? {hardwareId: device.hardwareId} : {}), ...point, status: 'applying', autoReconnect: Boolean(wasLive), refreshCount: 0, lastRefreshAt: null, message: recovering ? 'Reconnecting this phone and sending the new location…' : 'Sending the selected location to your phone…', startedAt: new Date(this.now()).toISOString() };
       this.state.session = current;
       // Journal before device mutation, so a crash cannot discard an unresolved session.
       try { await this.persist(); }
@@ -257,7 +285,7 @@ export class Controller extends EventEmitter {
   }
   confirmActive(current, result = {}) {
     current.status = 'active'; current.autoReconnect = true;
-    current.message = current.platform === 'ios' ? 'Sending the selected location every second while USB stays connected.' : 'The phone helper sends the selected location every two seconds.';
+    current.message = current.platform === 'ios' ? 'Sending the selected location every second while the phone stays connected.' : 'The phone helper sends the selected location every two seconds.';
     current.lastRefreshAt = result?.refreshedAt || new Date(this.now()).toISOString();
     current.refreshCount = Math.max(current.refreshCount || 0, result?.refreshCount || 1);
     current.refreshSource = current.platform === 'ios' ? 'command-ack' : 'helper-readback';
@@ -291,7 +319,7 @@ export class Controller extends EventEmitter {
     const current = this.state.session;
     if (!this.canResume(current) || this.suspended || this.state.busy || this.now() < this.retryAt ||
       !['waiting', 'unknown'].includes(current.status)) return;
-    const device = this.state.devices.find(d => d.id === current.deviceId && d.connection === 'usb' && d.state === 'ready');
+    const device = this.state.devices.find(d => d.id === current.deviceId && d.connection === (current.connection || 'usb') && d.state === 'ready');
     if (!device) return;
     const operation = this.exclusive(async () => {
       if (this.state.session !== current || !this.canResume(current)) return;
@@ -394,7 +422,7 @@ export class Controller extends EventEmitter {
     }
     const started = this.clock(), elapsed = started - this.routeStepAt;
     if (elapsed < 1000) { this.scheduleRouteTick(1000 - elapsed); return; }
-    if (elapsed > 2000) { await this.pauseRoute(); this.state.route.message = 'Updates fell behind. Resume when the computer and USB connection are ready.'; this.notify(); return; }
+    if (elapsed > 2000) { await this.pauseRoute(); this.state.route.message = 'Updates fell behind. Resume when the computer and phone connection are ready.'; this.notify(); return; }
     this.routeStepAt = started;
     const operation = async () => {
       try {
@@ -415,7 +443,7 @@ export class Controller extends EventEmitter {
           route.status = 'completed'; route.message = 'Arrived. Your phone holds the destination until you restore real location.';
           await this.persist();
         } else if (this.clock() - started >= 1000) {
-          this.pauseRouteMotion('USB updates are taking longer than a second. Check the connection, then resume.');
+          this.pauseRouteMotion('Location updates are taking longer than a second. Check the connection, then resume.');
           await this.persist();
         }
         this.notify();

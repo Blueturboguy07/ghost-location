@@ -1,10 +1,11 @@
-"""Ghost iOS bridge: private JSONL stdin/stdout, one strictly USB DVT session.
+"""Ghost iOS bridge: private JSONL stdin/stdout, one explicitly selected USB or Wi-Fi DVT session.
 
 No request is acknowledged until the awaited upstream operation completes.
 The DVT set selector expects a device reply; clear is an upstream no-reply selector.
 """
 import asyncio
-from contextlib import AsyncExitStack, suppress
+from contextlib import AsyncExitStack, aclosing, suppress
+from contextvars import ContextVar
 from datetime import datetime, timezone
 import importlib.metadata
 import json
@@ -25,7 +26,7 @@ logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 from packaging.version import Version
 from pymobiledevice3 import usbmux
 from pymobiledevice3.exceptions import AlreadyMountedError
-from pymobiledevice3.lockdown import create_using_usbmux
+from pymobiledevice3.lockdown import create_using_usbmux, get_mobdev2_lockdowns
 from pymobiledevice3.remote import userspace_tunnel
 from pymobiledevice3.remote.tunnel_service import CoreDeviceTunnelProxy
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
@@ -56,14 +57,29 @@ async def usb_lockdown(udid, autopair=False):
     return await create_using_usbmux(serial=udid, connection_type="USB", autopair=autopair, pair_timeout=20)
 
 
-async def strict_usb_provider(serial, autopair, remotepairing_fallback=False):
-    """Narrow the pinned upstream factory to USB; never discover Bonjour/network devices.
+# A request chooses its transport explicitly. Child tunnel tasks inherit this
+# context, while concurrent discovery and refresh tasks keep their own context.
+CONNECTION = ContextVar("ghost_connection", default="usb")
 
-    UserspaceRsdTunnel 11.12.4's factory otherwise omits connection_type on its
-    lockdown connection. Replacing only that factory retains its full lifecycle,
-    transport watcher and process-global stack cleanup while enforcing USB.
-    """
-    lockdown = await usb_lockdown(serial, autopair=False)
+
+async def connection_lockdown(udid, autopair=False):
+    if CONNECTION.get() == "usb":
+        return await usb_lockdown(udid, autopair=autopair)
+    if not isinstance(udid, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,80}", udid):
+        raise ValueError("A specific iPhone identifier is required.")
+    async with asyncio.timeout(8):
+        async with aclosing(get_mobdev2_lockdowns(only_paired=True, timeout=2)) as devices:
+            async for _address, lockdown in devices:
+                # Bonjour names and pairing records alone do not establish identity.
+                if lockdown.udid == udid and lockdown.paired:
+                    return lockdown
+                await lockdown.close()
+    raise ConnectionError("This trusted iPhone was not found on Wi-Fi. Unlock it, use the same network and enable Wi-Fi over USB first.")
+
+
+async def strict_usb_provider(serial, autopair, remotepairing_fallback=False):
+    """Use only the requested transport; retain the pinned rootless tunnel lifecycle."""
+    lockdown = await connection_lockdown(serial, autopair=False)
     try:
         if not lockdown.paired:
             raise RuntimeError("Unlock the iPhone and trust this computer first.")
@@ -85,35 +101,62 @@ class Bridge:
         self.target_sequence = 0
         self.transport_error = None
 
+    async def describe(self, lockdown, connection):
+        item = {"id": f"ios:{lockdown.udid}", "serial": lockdown.udid,
+                "platform": "ios", "name": lockdown.all_values.get("DeviceName") or lockdown.product_type or "iPhone",
+                "osVersion": lockdown.product_version, "connection": connection,
+                "state": "unauthorized", "detail": "Unlock your iPhone and trust this computer over USB."}
+        if not lockdown.paired:
+            pass
+        elif Version(lockdown.product_version) < Version("17.4"):
+            item.update(state="setup-required", detail="This version supports iOS 17.4 or later.")
+        elif not await lockdown.get_developer_mode_status():
+            item.update(state="setup-required", detail="Enable Developer Mode in Settings → Privacy & Security.")
+        else:
+            item.update(state="ready", detail=f"{'Wi-Fi' if connection == 'wifi' else 'USB'} connected. Developer Mode enabled.")
+        return item
+
     async def discover(self):
-        devices = await usbmux.list_devices()
         result = []
-        for device in devices:
+        if CONNECTION.get() == "wifi":
+            seen = set()
+            # Bound Bonjour discovery so an unreachable paired phone cannot hang a scan.
+            try:
+                async with asyncio.timeout(8):
+                    async with aclosing(get_mobdev2_lockdowns(only_paired=True, timeout=2)) as devices:
+                        async for _address, lockdown in devices:
+                            async with lockdown:
+                                if lockdown.udid not in seen and lockdown.paired:
+                                    result.append(await self.describe(lockdown, "wifi"))
+                                    seen.add(lockdown.udid)
+            except TimeoutError:
+                pass
+            return result
+        for device in await usbmux.list_devices():
             if device.connection_type != "USB":
                 continue
-            item = {"id": f"ios:{device.serial}", "serial": device.serial,
-                    "platform": "ios", "name": "iPhone", "osVersion": "",
-                    "connection": "usb", "state": "unauthorized",
-                    "detail": "Unlock your iPhone and trust this computer."}
             try:
                 async with await usb_lockdown(device.serial) as lockdown:
-                    item["name"] = lockdown.all_values.get("DeviceName") or lockdown.product_type or "iPhone"
-                    item["osVersion"] = lockdown.product_version
-                    if not lockdown.paired:
-                        pass
-                    elif Version(lockdown.product_version) < Version("17.4"):
-                        item.update(state="setup-required", detail="This version supports iOS 17.4 or later.")
-                    elif not await lockdown.get_developer_mode_status():
-                        item.update(state="setup-required", detail="Enable Developer Mode in Settings → Privacy & Security.")
-                    else:
-                        item.update(state="ready", detail="USB connected. Developer Mode enabled.")
+                    result.append(await self.describe(lockdown, "usb"))
             except Exception as error:
-                item["detail"] = explain(error)
-            result.append(item)
+                result.append({"id": f"ios:{device.serial}", "serial": device.serial,
+                               "platform": "ios", "name": "iPhone", "osVersion": "",
+                               "connection": "usb", "state": "unauthorized", "detail": explain(error)})
         return result
 
-    async def prepare(self, udid):
+    async def enable_wifi(self, udid):
+        if self.session:
+            raise RuntimeError("Restore the current location before configuring Wi-Fi.")
         async with await usb_lockdown(udid, autopair=True) as lockdown:
+            if not lockdown.paired:
+                raise RuntimeError("Unlock the iPhone and trust this computer first.")
+            # Cache the existing trusted record for authenticated Bonjour discovery.
+            await lockdown.save_pair_record()
+            await lockdown.set_enable_wifi_connections(True)
+        return {"enabled": True, "message": "Wi-Fi enabled. Keep both devices on the same network, then choose Wi-Fi in Ghost."}
+
+    async def prepare(self, udid):
+        async with await connection_lockdown(udid, autopair=True) as lockdown:
             if not lockdown.paired:
                 raise RuntimeError("Unlock the iPhone and trust this computer.")
             if Version(lockdown.product_version) < Version("17.4"):
@@ -132,17 +175,17 @@ class Bridge:
         if self.transport_error:
             raise RuntimeError("The previous iPhone transport did not close completely. Reset the connection to retry.")
         if self.session:
-            if self.session["udid"] == udid:
+            if self.session["udid"] == udid and self.session.get("connection", "usb") == CONNECTION.get():
                 # A new lockdown connection after replug says nothing about the old
                 # DVT stream. Check its lifetime both before and after the USB probe.
                 session = self.session
                 if self.session_usable(session):
                     try:
-                        async with await usb_lockdown(udid):
+                        async with await connection_lockdown(udid):
                             if self.session_usable(session):
                                 return session
                     except BaseException:
-                        await self.fail_session(session, "iPhone USB connection ended. Location state is unknown.")
+                        await self.fail_session(session, "iPhone connection ended. Location state is unknown.")
                         raise
                 await self.fail_session(session, "iPhone developer connection ended. Location state is unknown.")
             else:
@@ -163,7 +206,7 @@ class Bridge:
                 self.transport_error = error
                 raise
             raise
-        session = {"udid": udid, "stack": stack, "dvt": dvt, "tunnel": tunnel,
+        session = {"udid": udid, "connection": CONNECTION.get(), "stack": stack, "dvt": dvt, "tunnel": tunnel,
                    "location": location, "active": False, "valid": True, "target": None}
         self.session = session
         session["watcher"] = asyncio.create_task(self.watch_session(session))
@@ -256,15 +299,27 @@ class Bridge:
                 raise
 
     async def dispatch(self, method, params):
+        connection = params.get("connection", "usb")
+        if connection not in ("usb", "wifi"):
+            raise ValueError("Choose USB or Wi-Fi.")
+        token = CONNECTION.set(connection)
+        try:
+            return await self._dispatch(method, params)
+        finally:
+            CONNECTION.reset(token)
+
+    async def _dispatch(self, method, params):
         if method == "status":
             version = importlib.metadata.version("pymobiledevice3")
-            return {"available": version == PINNED_VERSION, "message": f"iPhone support {version}; iOS 17.4+ over USB.",
+            return {"available": version == PINNED_VERSION, "message": f"iPhone support {version}; iOS 17.4+ over USB or paired Wi-Fi.",
                     "protocolVersion": PROTOCOL_VERSION}
-        # Discovery opens independent, explicitly USB lockdown connections. It
+        # Discovery opens independent lockdown connections. It
         # must not pause the persistent DVT refresh loop behind slow trust probes.
         if method == "discover":
             return await self.discover()
         async with self.lock:
+            if method == "enable-wifi":
+                return await self.enable_wifi(params.get("udid"))
             if method == "prepare":
                 return await self.prepare(params.get("udid"))
             if method == "set":
@@ -305,11 +360,11 @@ class Bridge:
                 return {"cleared": True, "message": "Restore command sent to the iPhone."}
             if method == "reset":
                 if self.session and self.session["udid"] != params.get("udid"):
-                    raise ValueError("The selected iPhone does not own the current USB session.")
+                    raise ValueError("The selected iPhone does not own the current session.")
                 await self.close_session(clear=False)
                 if self.transport_error:
                     raise RuntimeError("iPhone transport cleanup failed; restart the sidecar before reconnecting.")
-                return {"reset": True, "message": "USB developer transport closed; the next request creates a fresh connection."}
+                return {"reset": True, "message": "Developer transport closed; the next request creates a fresh connection."}
             if method == "shutdown":
                 # A normal quit may explicitly preserve an unresolved session journal
                 # without sending another restore command. Closing the transport does

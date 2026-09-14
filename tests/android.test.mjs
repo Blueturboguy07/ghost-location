@@ -19,6 +19,7 @@ function rig({devices = 'USB123 device usb:1-2 product:test model:Pixel_8 transp
     const command = args.join(' ');
     if (command === 'devices -l') stdout = `List of devices attached\n${devices}\n`;
     else if (command === 'version') stdout = 'Android Debug Bridge version 1.0.41';
+    else if (command.endsWith('getprop ro.serialno')) stdout = args[1].includes('other') ? 'OTHER123' : 'USB123';
     else if (command.endsWith('getprop ro.build.version.sdk')) stdout = '35\n';
     else if (command.endsWith('getprop ro.build.version.release')) stdout = '15\n';
     else if (command.endsWith('get-devpath')) stdout = 'usb:1-2\n';
@@ -328,4 +329,68 @@ test('Android below API 26 is blocked before installation', async () => {
   const {adapter, calls} = rig({override: args => args.at(-1) === 'ro.build.version.sdk' ? {stdout: '25\n'} : null});
   await assert.rejects(adapter.prepare(phone), /Android 8.0/);
   assert.ok(!calls.some(call => call.args.includes('install')));
+});
+
+test('Wi-Fi discovery is opt-in and location updates target only the chosen network phone', async () => {
+  const serial = '192.168.1.20:40567';
+  const {adapter, calls} = rig({devices: `USB123 device usb:1-2\n${serial} device model:Pixel_8\nadb-other._adb-tls-connect._tcp device model:Other\nemulator-5554 device`});
+  assert.deepEqual((await adapter.list()).map(d => d.serial), ['USB123']);
+  adapter.connection = 'wifi';
+  const devices = await adapter.list();
+  assert.equal(devices.length, 2);
+  assert.ok(devices.every(d => d.connection === 'wifi'));
+  const device = devices.find(d => d.serial === serial);
+  await adapter.set(device, {latitude: 1, longitude: 2, sessionId: 'wifi-session'});
+  for (let second = 1; second <= 6; second++) await adapter.update(device, {latitude: 1 + second / 1000, longitude: 2, sessionId: 'wifi-session'});
+  await adapter.clear(device);
+  assert.equal(adapter.active.size, 0);
+  const writes = calls.filter(call => call.args.some(arg => ['start-foreground-service', 'stopservice'].includes(arg)));
+  assert.equal(writes.filter(call => call.args.includes('start-foreground-service')).length, 7);
+  assert.ok(writes.every(call => call.args[0] === '-s' && call.args[1] === serial));
+});
+
+test('Android wireless pairing validates input and keeps the code out of argv and errors', async () => {
+  const calls = [];
+  let output = 'Successfully paired to 192.168.1.20:37123';
+  const adapter = new AndroidAdapter({runner: async (_file, args, options) => {
+    calls.push({args, options}); return {code: 0, stdout: output, stderr: ''};
+  }});
+  adapter.connection = 'wifi';
+  for (const endpoint of ['--help', '192.168.1.20:0', '192.168.1.20:65536', '999.1.1.1:42', 'localhost;shutdown:42']) {
+    await assert.rejects(adapter.connectWifi({endpoint, code: '123456'}));
+  }
+  await assert.rejects(adapter.connectWifi({endpoint: '192.168.1.20:37123', code: '12345x'}));
+  assert.equal(calls.length, 0);
+  await adapter.connectWifi({endpoint: '192.168.1.20:37123', code: '123456'});
+  assert.deepEqual(calls[0].args, ['pair', '192.168.1.20:37123']);
+  assert.equal(calls[0].options.input, '123456\n');
+  output = 'failed to connect, secret 123456';
+  await assert.rejects(adapter.connectWifi({endpoint: '192.168.1.20:40567'}), error => /Connection failed/.test(error.message) && !error.message.includes('123456'));
+  output = 'connected to 192.168.1.20:40567';
+  await adapter.connectWifi({endpoint: '192.168.1.20:40567'});
+  assert.deepEqual(calls.at(-1).args, ['connect', '192.168.1.20:40567']);
+});
+
+test('Android keeps the same phone identity across Wi-Fi port changes and rejects a reused address', async () => {
+  let endpoint = '192.168.1.20:40000', identity = 'USB123';
+  const {adapter, calls} = rig({override: args => {
+    if (args.join(' ') === 'devices -l') return {stdout: `${endpoint !== '192.168.1.20:40000' ? '192.168.1.20:40000 offline\n' : ''}${endpoint} device model:Pixel_8\n`};
+    if (args.at(-1) === 'ro.serialno') return {stdout: identity};
+  }});
+  adapter.connection = 'wifi';
+  const before = (await adapter.list())[0];
+  await adapter.set(before, {latitude: 1, longitude: 2, sessionId: 'wifi-port'});
+  endpoint = '192.168.1.20:40001';
+  const after = (await adapter.list())[0];
+  assert.equal(after.id, before.id);
+  assert.notEqual(after.serial, before.serial);
+  await adapter.update(after, {latitude: 1.001, longitude: 2, sessionId: 'wifi-port'});
+  assert.equal(calls.at(-1).args[1], endpoint);
+  identity = 'OTHERPHONE';
+  const writesBefore = calls.filter(call => call.args.includes('stopservice')).length;
+  await assert.rejects(adapter.clear(after), /phone at this address has changed/);
+  assert.equal(calls.filter(call => call.args.includes('stopservice')).length, writesBefore);
+  identity = 'USB123';
+  await adapter.clear(after);
+  assert.equal(adapter.active.size, 0);
 });

@@ -134,3 +134,12 @@ verified support across all four host/phone combinations.
 Ghost is published at [publikhq.com/ghost](https://publikhq.com/ghost), with approved Mac and Windows guides and a pinned 0.1.5 release. The listing, installation pages, and public Iris guide endpoint returned successfully. The direct-install button opens Publik’s existing sign-in gate for anonymous visitors. Public GitHub download endpoints respond successfully; all uploaded SHA-256 digests match the downloaded CI artifacts, and both DMG and ZIP integrity checks pass.
 
 Publik’s existing guide/assembler/submission test selection passed 152 tests. The Ghost renderer rehearsal passed fixed-location heartbeats and route planning/start/pause/resume with no phone adapters loaded. Published guide and listing inputs are preserved in `publik-guide.json` and `publik-listing.json`; retain the app-specific setup and route steps when preparing a later guide version.
+
+## 0.1.6 Wi-Fi implementation (2026-09-14)
+
+- 122 Node tests pass, including the wrapper that runs 21 Python bridge tests. USB remains the default. Wi-Fi tests cover exact iPhone identity and transport selection, no USB fallback, repeated refreshes, cleanup, Android pairing over stdin, separate pairing/connect ports, serial identity across port changes, address reuse rejection, and disconnected-session recovery.
+- iPhone and Android route controller tests pass over both connection modes: one update per second, 45 mph, stable session, exact arrival point and restoration.
+- Isolated Electron renderer rehearsal passes fixed-location heartbeats, route controls, connection mode controls, pairing/connect form dispatch, drafts surviving state updates and code clearing after submit. It loads no device adapters and blocks network requests.
+- macOS arm64 sidecar rebuilt from the changed bridge; frozen runtime protocol smoke, resource provenance checks, and the packaged 0.1.6 `Ghost.app` smoke pass. The packaged app exercises real Wi-Fi discovery IPC and switches back to USB using temporary settings. Both bundled runtimes report available. No phone location commands were sent.
+- **Physical Wi-Fi Set / route / Restore has not been tested.** Windows and Intel Mac 0.1.6 builds have not been run in this workspace. These checks establish implementation and local packaging behavior, not all four host/phone hardware combinations.
+- The local 0.1.6 bundle is in `release/mac-arm64/Ghost.app`. Publik and GitHub release downloads remain at 0.1.5 until a new release is published.

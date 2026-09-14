@@ -55,6 +55,8 @@ async function boot() {
 
   const handlers = {
     getState: () => controller.snapshot(),
+    setConnection: value => controller.setConnection(value),
+    connectWifi: value => controller.connectWifi(value),
     scanDevices: () => controller.scanDevices(),
     prepareDevice: id => controller.prepareDevice(id),
     applyLocation: value => controller.applyLocation(value),

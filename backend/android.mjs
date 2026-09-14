@@ -1,5 +1,6 @@
 import {access} from 'node:fs/promises';
 import path from 'node:path';
+import {isIP} from 'node:net';
 import {run} from './process.mjs';
 import {coordinates} from './validation.mjs';
 
@@ -10,12 +11,24 @@ const VALID_SERIAL = /^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/;
 const COMMAND_ERROR = /(?:^|\n)\s*(?:error\b|failure\b|exception\b|security\s*exception\b|java\.[\w.]*exception\b)|permission denial|permission denied|not allowed to start|requires? permission|device (?:offline|unauthorized)|no devices\/emulators found|more than one device/i;
 const exists = async file => { try { await access(file); return true; } catch { return false; } };
 
-export function parseDevices(output) {
+export function wifiEndpoint(value) {
+  if (typeof value !== 'string') throw new Error('Enter the phone’s IP address and port, such as 192.168.1.20:37123.');
+  const match = value.trim().match(/^(\d{1,3}(?:\.\d{1,3}){3}):([1-9]\d{0,4})$/);
+  if (!match || isIP(match[1]) !== 4 || Number(match[2]) > 65535) throw new Error('Enter a valid IPv4 address and port from Wireless debugging.');
+  return `${match[1]}:${Number(match[2])}`;
+}
+
+function networkSerial(serial) {
+  try { return wifiEndpoint(serial) === serial; } catch { return /^adb-[A-Za-z0-9_-]+\._adb-tls-connect\._tcp\.?$/.test(serial); }
+}
+
+export function parseDevices(output, connection = 'usb') {
   return output.split(/\r?\n/).map(line => {
     const match = line.match(/^(\S+)\s+(device|unauthorized|offline)\b(.*)$/);
     if (!match) return null;
     const [, serial, adbState, tail] = match;
-    if (!VALID_SERIAL.test(serial) || /^emulator-|_adb-tls-|\.local$/i.test(serial)) return null;
+    const wifi = networkSerial(serial);
+    if (connection === 'wifi' ? !wifi : (!VALID_SERIAL.test(serial) || /^emulator-|_adb-tls-|\.local$/i.test(serial))) return null;
     const fields = Object.fromEntries([...tail.matchAll(/\b([a-z_]+):([^\s]+)/g)].map(m => [m[1], m[2]]));
     return {serial, adbState, fields, usb: Boolean(fields.usb)};
   }).filter(Boolean);
@@ -28,7 +41,9 @@ export class AndroidAdapter {
     this.runner = runner;
     this.onSessionEnd = onSessionEnd;
     this.onLocationRefresh = onLocationRefresh;
+    this.connection = 'usb';
     this.knownUsb = new Set();
+    this.knownWifi = new Map();
     this.active = new Map();
     this.endedNotifications = new Set();
     this.healthFailures = new Map();
@@ -48,9 +63,9 @@ export class AndroidAdapter {
     return binary;
   }
 
-  async command(args, {timeoutMs = 15_000, tolerateFailure = false} = {}) {
+  async command(args, {timeoutMs = 15_000, tolerateFailure = false, input} = {}) {
     let result;
-    try { result = await this.runner(await this.executable(), args, {timeoutMs}); }
+    try { result = await this.runner(await this.executable(), args, {timeoutMs, input}); }
     catch (error) {
       if (error.code === 'ENOENT') throw new Error('Android tools are missing. Run the Android resource preparation script or install Android Platform Tools.');
       throw error;
@@ -71,8 +86,8 @@ export class AndroidAdapter {
 
   serialOf(device) {
     const serial = typeof device === 'string' ? device.replace(/^android:/, '') : device?.serial;
-    if (!serial || !VALID_SERIAL.test(serial) || /^emulator-/i.test(serial)) throw new Error('A valid USB Android device must be selected.');
-    if (typeof device === 'object' && (device.platform !== 'android' || device.id !== `android:${serial}`)) throw new Error('Android device identity does not match its serial.');
+    if (!serial || !(this.connection === 'wifi' ? networkSerial(serial) : VALID_SERIAL.test(serial) && !/^emulator-|_adb-tls-/i.test(serial))) throw new Error(`A valid ${this.connection === 'wifi' ? 'Wi-Fi' : 'USB'} Android device must be selected.`);
+    if (typeof device === 'object' && (device.platform !== 'android' || device.id !== `android:${device.hardwareId || serial}` || (device.hardwareId && !VALID_SERIAL.test(device.hardwareId)))) throw new Error('Android device identity does not match its serial.');
     return serial;
   }
 
@@ -81,7 +96,19 @@ export class AndroidAdapter {
   async transports() {
     const {stdout} = await this.command(['devices', '-l']);
     const devices = [];
-    for (const entry of parseDevices(stdout)) {
+    for (const entry of parseDevices(stdout, this.connection)) {
+      if (this.connection === 'wifi') {
+        if (entry.adbState === 'device') {
+          try {
+            const identity = (await this.shell(entry.serial, ['getprop', 'ro.serialno'], {timeoutMs: 5000})).stdout.trim();
+            if (!VALID_SERIAL.test(identity) || identity === 'unknown') continue;
+            this.knownWifi.set(entry.serial, identity);
+          } catch { continue; }
+        }
+        entry.hardwareId = this.knownWifi.get(entry.serial);
+        if (entry.hardwareId) devices.push(entry);
+        continue;
+      }
       if (!entry.usb) {
         try {
           const devpath = await this.command(['-s', entry.serial, 'get-devpath'], {timeoutMs: 5_000});
@@ -91,15 +118,24 @@ export class AndroidAdapter {
       if (entry.usb) this.knownUsb.add(entry.serial);
       if (entry.usb || (entry.adbState !== 'device' && this.knownUsb.has(entry.serial))) devices.push(entry);
     }
-    return devices;
+    // ADB can list both an IP endpoint and an mDNS alias for the same phone.
+    const unique = new Map();
+    for (const entry of devices) {
+      const key = entry.hardwareId || entry.serial;
+      const previous = unique.get(key);
+      if (!previous || (previous.adbState !== 'device' && entry.adbState === 'device') ||
+          (previous.adbState === entry.adbState && this.active.has(entry.serial))) unique.set(key, entry);
+    }
+    return [...unique.values()];
   }
 
   async assertConnected(device) {
     const serial = this.serialOf(device);
     const transport = (await this.transports()).find(item => item.serial === serial);
-    if (!transport) throw new Error('This Android phone is not connected over USB. Reconnect it before continuing.');
+    if (!transport) throw new Error(`This Android phone is not connected over ${this.connection === 'wifi' ? 'Wi-Fi' : 'USB'}. Reconnect it before continuing.`);
+    if (`android:${transport.hardwareId || serial}` !== device.id) throw new Error('The phone at this address has changed. Refresh and select it again.');
     if (transport.adbState === 'unauthorized') throw new Error('Unlock the Android phone and accept the USB debugging authorization prompt.');
-    if (transport.adbState !== 'device') throw new Error('The Android phone is offline. Unlock it and reconnect the USB cable.');
+    if (transport.adbState !== 'device') throw new Error('The Android phone is offline. Unlock it and reconnect.');
     return serial;
   }
 
@@ -125,15 +161,24 @@ export class AndroidAdapter {
     if (!/MOCK_LOCATION:\s*allow|android:mock_location:\s*allow/i.test(appops.stdout)) return {ready: false, detail: 'Select Appium Settings as the mock location app in Developer options, or run setup.'};
     if (!/android\.permission\.ACCESS_FINE_LOCATION:\s*granted=true/.test(packageInfo.stdout)) return {ready: false, detail: 'The Android helper needs precise location permission. Run setup.'};
     if (/^(?:0|null)\s*$/.test(mode.stdout)) return {ready: false, detail: 'Turn on Location in the Android phone settings.'};
-    return {ready: true, detail: 'USB connected. Ready to set a location.'};
+    return {ready: true, detail: `${this.connection === 'wifi' ? 'Wi-Fi' : 'USB'} connected. Ready to set a location.`};
   }
 
   async list() {
     const entries = await this.transports();
     return Promise.all(entries.map(async entry => {
-      const device = {id: `android:${entry.serial}`, serial: entry.serial, platform: 'android', name: (entry.fields.model || entry.serial).replaceAll('_', ' '), osVersion: '', connection: 'usb'};
-      if (entry.adbState !== 'device') return {...device, state: entry.adbState, detail: entry.adbState === 'unauthorized' ? 'Unlock this phone and accept the USB debugging prompt.' : 'Phone is offline. Reconnect the USB cable.'};
+      const device = {id: `android:${entry.hardwareId || entry.serial}`, serial: entry.serial, ...(entry.hardwareId ? {hardwareId: entry.hardwareId} : {}), platform: 'android', name: (entry.fields.model || entry.serial).replaceAll('_', ' '), osVersion: '', connection: this.connection};
+      if (entry.adbState !== 'device') return {...device, state: entry.adbState, detail: entry.adbState === 'unauthorized' ? 'Unlock this phone and accept the USB debugging prompt.' : 'Phone is offline. Reconnect it.'};
       try {
+        // Keep ownership when Android changes its Wi-Fi port or ADB uses an alias.
+        // Identity was read from the authenticated device during this scan.
+        for (const [oldSerial, target] of this.active) {
+          if (target.id !== device.id || oldSerial === entry.serial) continue;
+          this.active.delete(oldSerial);
+          this.active.set(entry.serial, {...target, ...device});
+          if (this.endedNotifications.delete(oldSerial)) this.endedNotifications.add(entry.serial);
+          this.healthFailures.delete(oldSerial);
+        }
         const info = await this.info(entry.serial);
         const check = await this.readiness(entry.serial, info.api);
         if (this.active.has(entry.serial)) {
@@ -146,6 +191,21 @@ export class AndroidAdapter {
         return {...device, osVersion: info.osVersion, state: check.ready ? 'ready' : 'setup-required', detail: check.detail};
       } catch (error) { return {...device, state: 'setup-required', detail: error.message}; }
     }));
+  }
+
+  async connectWifi({endpoint, code} = {}) {
+    const address = wifiEndpoint(endpoint);
+    if (code !== undefined && (typeof code !== 'string' || !/^\d{6}$/.test(code))) throw new Error('Enter the six-digit pairing code shown on the phone.');
+    if (this.connection !== 'wifi') throw new Error('Choose Wi-Fi before pairing or connecting.');
+    const pairing = code !== undefined;
+    // The short-lived pairing secret goes through stdin, never command arguments or settings.
+    const result = await this.command([pairing ? 'pair' : 'connect', address], {
+      timeoutMs: 30_000, tolerateFailure: true, input: pairing ? `${code}\n` : undefined,
+    }).catch(() => { throw new Error('Wireless debugging did not respond. Check the address, port and Wi-Fi connection.'); });
+    if (result.code !== 0 || !(pairing ? /Successfully paired to/i : /(?:already )?connected to/i).test(result.output) || /failed|cannot|unable/i.test(result.output)) {
+      throw new Error(pairing ? 'Pairing failed. Open Pair device with pairing code and try the new code and pairing port.' : 'Connection failed. Use the IP address and port on the main Wireless debugging screen.');
+    }
+    return {ok: true};
   }
 
   async prepare(device) {

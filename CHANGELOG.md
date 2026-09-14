@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6
+
+- Add explicit USB and same-network Wi-Fi connection modes on Mac and Windows.
+- Enable trusted iPhone Wi-Fi connections after a one-time USB setup; iOS 17.4+ required.
+- Pair Android 11+ using Wireless debugging, with separate pairing and connection ports.
+- Preserve Android phone identity across changed Wi-Fi ports and reject reused addresses belonging to another phone.
+- Keep fixed-location refreshes and one-second route updates over Wi-Fi; pause routes on connection loss.
+- Add guided setup, pairing-code cleanup, transport and UI tests. Physical Wi-Fi validation remains pending.
+
 ## 0.1.5
 
 - Plan driving routes through 2–12 ordered map/search stops using OSRM and OpenStreetMap roads.

@@ -1,8 +1,8 @@
 {
   "name": "ghost-location",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
-  "description": "Choose a place. Set your phone's location over USB.",
+  "description": "Choose a place. Set your phone's location over USB or Wi-Fi.",
   "author": "Ghost contributors",
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -70,7 +70,15 @@
         "zip"
       ],
       "category": "public.app-category.developer-tools",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "Ghost connects to your trusted phone on the same Wi-Fi network to simulate locations.",
+        "NSBonjourServices": [
+          "_apple-mobdev2._tcp",
+          "_adb-tls-connect._tcp",
+          "_adb-tls-pairing._tcp"
+        ]
+      }
     },
     "win": {
       "target": [

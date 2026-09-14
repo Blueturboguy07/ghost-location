@@ -28,6 +28,8 @@ export function createPreviewBridge() {
   return {
     getState: async () => structuredClone(state),
     scanDevices: async () => structuredClone(state),
+    setConnection: desktopOnly,
+    connectWifi: desktopOnly,
     prepareDevice: desktopOnly,
     applyLocation: desktopOnly,
     stopLocation: desktopOnly,

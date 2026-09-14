@@ -274,6 +274,81 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(RuntimeError, "did not close completely"):
             await bridge_module.Bridge.connect(bridge, "phone")
 
+    async def test_wifi_factory_uses_only_paired_exact_identity_and_closes_other_phones(self):
+        wanted = "00008030-0000000000000001"
+        other = SimpleNamespace(udid="00008030-0000000000000002", paired=True, close=AsyncMock())
+        selected = SimpleNamespace(udid=wanted, paired=True, close=AsyncMock())
+        options = []
+        async def network_devices(**kwargs):
+            options.append(kwargs)
+            yield "192.168.1.21", other
+            yield "192.168.1.20", selected
+        token = bridge_module.CONNECTION.set("wifi")
+        try:
+            with patch.object(bridge_module, "get_mobdev2_lockdowns", network_devices), patch.object(bridge_module, "usb_lockdown", AsyncMock()) as usb:
+                with patch.object(bridge_module.CoreDeviceTunnelProxy, "create", AsyncMock(return_value="proxy")):
+                    self.assertEqual(await bridge_module.strict_usb_provider(wanted, True, True), ("proxy", selected))
+                usb.assert_not_awaited()
+            self.assertTrue(options[0]["only_paired"])
+            other.close.assert_awaited_once()
+            selected.close.assert_not_awaited()
+        finally:
+            bridge_module.CONNECTION.reset(token)
+
+    async def test_wifi_missing_phone_never_falls_back_to_usb(self):
+        async def network_devices(**kwargs):
+            if False:
+                yield None
+        token = bridge_module.CONNECTION.set("wifi")
+        try:
+            with patch.object(bridge_module, "get_mobdev2_lockdowns", network_devices), patch.object(bridge_module, "usb_lockdown", AsyncMock()) as usb:
+                with self.assertRaisesRegex(ConnectionError, "not found on Wi-Fi"):
+                    await bridge_module.connection_lockdown("00008030-0000000000000001")
+                usb.assert_not_awaited()
+        finally:
+            bridge_module.CONNECTION.reset(token)
+
+    async def test_wifi_requests_keep_streaming_and_clear_the_session(self):
+        bridge, session, _ = self.connected_bridge(refresh_interval=0.005)
+        with patch.object(bridge_module, "emit"):
+            await bridge.dispatch("set", {"udid": "phone", "connection": "wifi", "latitude": 1, "longitude": 2})
+            await asyncio.sleep(0.04)
+            self.assertGreaterEqual(session["location"].set.await_count, 4)
+            await bridge.dispatch("set", {"udid": "phone", "connection": "wifi", "latitude": 3, "longitude": 4})
+            await asyncio.sleep(0.02)
+            self.assertEqual(session["location"].set.await_args.args, (3, 4))
+            await bridge.dispatch("clear", {"udid": "phone", "connection": "wifi"})
+            self.assertIsNone(bridge.session)
+            session["location"].clear.assert_awaited_once()
+        self.assertEqual(bridge_module.CONNECTION.get(), "usb")
+
+    async def test_enabling_wifi_uses_usb_trust_and_caches_pair_record(self):
+        bridge = bridge_module.Bridge()
+        lockdown = AsyncMock()
+        lockdown.paired = True
+        lockdown.__aenter__.return_value = lockdown
+        with patch.object(bridge_module, "usb_lockdown", AsyncMock(return_value=lockdown)) as usb:
+            result = await bridge.dispatch("enable-wifi", {"udid": "00008030-0000000000000001"})
+            self.assertTrue(result["enabled"])
+            usb.assert_awaited_once_with("00008030-0000000000000001", autopair=True)
+            lockdown.save_pair_record.assert_awaited_once()
+            lockdown.set_enable_wifi_connections.assert_awaited_once_with(True)
+
+    async def test_wifi_discovery_deduplicates_and_closes_connections(self):
+        bridge = bridge_module.Bridge()
+        lockdown = AsyncMock()
+        lockdown.udid = "00008030-0000000000000001"
+        lockdown.paired = True
+        lockdown.__aenter__.return_value = lockdown
+        async def devices(**kwargs):
+            yield "192.168.1.20", lockdown
+            yield "fe80::1", lockdown
+        bridge.describe = AsyncMock(return_value={"id": "phone", "connection": "wifi"})
+        with patch.object(bridge_module, "get_mobdev2_lockdowns", devices):
+            result = await bridge.dispatch("discover", {"connection": "wifi"})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(lockdown.__aexit__.await_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

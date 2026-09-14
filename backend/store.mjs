@@ -5,6 +5,7 @@ export const defaults = () => ({
   schemaVersion: 1, savedPlaces: [], recentPlaces: [], session: null,
   preferences: {
     restoreOnQuit: true,
+    connection: 'usb',
     geocoderUrl: 'https://photon.komoot.io/api/',
     onboardingComplete: false,
     hostPlatform: null,

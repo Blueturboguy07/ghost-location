@@ -8,6 +8,8 @@ const invoke = async (method, payload) => {
 
 contextBridge.exposeInMainWorld('ghost', Object.freeze({
   getState: () => invoke('getState'),
+  setConnection: value => invoke('setConnection', value),
+  connectWifi: value => invoke('connectWifi', value),
   scanDevices: () => invoke('scanDevices'),
   prepareDevice: id => invoke('prepareDevice', id),
   applyLocation: point => invoke('applyLocation', point),

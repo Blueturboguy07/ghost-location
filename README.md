@@ -1,11 +1,11 @@
 # Ghost
 
-A small Electron app for setting a fixed phone location or following a road route over USB. Search for a
+A small Electron app for setting a fixed phone location or following a road route over USB or Wi-Fi. Search for a
 place, drop a pin, or enter coordinates, then explicitly apply it to your selected
 phone. Windows and macOS share one interface and use the appropriate iPhone or
 Android adapter.
 
-Current version: **0.1.5**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
+Current version: **0.1.6**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
 interface, Android cleanup, Windows packaging, recovery-record, and reconnection changes.
 
 ![Ghost following an example road route in Chicago](docs/images/ghost-route.png)
@@ -14,7 +14,7 @@ interface, Android cleanup, Windows packaging, recovery-record, and reconnection
 
 ## Download and install
 
-Get [Ghost 0.1.5 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5).
+Get [Ghost 0.1.6 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6).
 Follow the [setup guide](SETUP.md) for Mac → iPhone, Windows → iPhone, Mac → Android, or Windows → Android, or use [Publik's guided install](https://publikhq.com/ghost/install).
 
 The downloads include the phone runtimes. No programming tools or Ghost account are needed. These early releases are unsigned; the guide explains opening them and the limits of current device testing.
@@ -26,10 +26,10 @@ The downloads include the phone runtimes. No programming tools or Ghost account 
 - Interactive map, manual place search, draggable pin, and latitude/longitude input.
 - First-run Mac/Windows and iPhone/Android survey with a checklist tailored to all four USB configurations.
 - Saved places and recent selections stored locally.
-- Real USB-only device discovery and guided setup.
+- Explicit USB or same-network Wi-Fi connections with guided pairing. iPhone pairs once over USB; Android 11+ uses a wireless pairing code.
 - iPhone location simulation through a bundled pymobiledevice3 sidecar.
 - Android location simulation through bundled ADB and Appium Settings.
-- Ongoing fixed-location updates and same-phone USB reconnection while Ghost stays open.
+- Ongoing fixed-location updates and same-phone reconnection while Ghost stays open.
 - Automatic stale recovery-record cleanup when a different usable USB phone appears.
 - Explicit restoration, normal-quit cleanup, and a persisted recovery journal.
 - Honest disconnected/error states: lost connectivity never means “restored”.
@@ -77,7 +77,7 @@ the manufacturer's ADB USB driver. No root is required by this approach.
 ## Session behavior
 
 Selecting a map pin only changes the preview. **Set location** starts or updates a
-fixed location on the selected USB phone. Only one unresolved phone session is
+fixed location on the selected phone. Only one unresolved phone session is
 kept at a time. When an unknown, waiting, or error recovery record belongs to a
 different phone and Ghost discovers another usable USB phone, Ghost automatically
 discards the old record so the newly connected phone can be prepared or have a
@@ -104,7 +104,7 @@ locations in other apps can take time to update. Normal quit attempts restoratio
 by default. If that fails, Ghost offers to keep the app open or quit with an
 unresolved session saved for recovery.
 
-If USB disconnects during a live session, Ghost waits and automatically reconnects
+If the phone disconnects during a live session, Ghost waits and automatically reconnects
 the **same phone and applied target** when it becomes available again, while the
 same Ghost process remains open. Selecting another pin still changes only the
 preview; use **Update location** to apply that target. You can also use **Retry
@@ -152,7 +152,7 @@ Settings' immediate update on each new target; its idle heartbeat remains two se
 exact destination; **Restore real location** stops simulation. Disconnect and sleep
 pause motion. Reconnection holds the last attempted point on the same phone until
 you press Resume. Slow commands or scheduling stalls pause rather than building a
-backlog or jumping ahead. Timings depend on the operating system and USB latency;
+backlog or jumping ahead. Timings depend on the operating system and connection latency;
 the app does not guarantee that every phone app consumes each fix.
 
 Route geometry and progress stay in memory. Restarting Ghost does not resume a
@@ -195,8 +195,8 @@ device runtimes. Release installers are unsigned. Signing/notarization credentia
 for a trusted macOS launch and a recognized Windows publisher.
 No publishing or repository upload is performed by these commands.
 
-For v0.1.5, a macOS arm64 build produces `Ghost-0.1.5-mac-arm64.dmg` and
-`Ghost-0.1.5-mac-arm64.zip` in `release/`.
+For v0.1.6, a macOS arm64 build produces `Ghost-0.1.6-mac-arm64.dmg` and
+`Ghost-0.1.6-mac-arm64.zip` in `release/`.
 
 ### Native CI builds
 
@@ -259,3 +259,5 @@ before claiming all four connections are verified.
 ## License
 
 GPL-3.0-or-later. See LICENSE and THIRD_PARTY_NOTICES.md.
+
+For wireless setup, see [the Wi-Fi guide](SETUP.md#connect-over-the-same-wi-fi-network-016). Wi-Fi support is implemented and covered by automated tests; physical phone validation is still needed.

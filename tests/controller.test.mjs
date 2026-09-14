@@ -356,3 +356,45 @@ test('saved places round-trip rename, delete and bounds', async () => {
   await c.deletePlace(id); assert.equal(store.data.savedPlaces.length, 0);
   await assert.rejects(c.savePlace({ ...point, longitude: 181 }));
 });
+
+test('Wi-Fi selection persists and fixed sessions reconnect only on the selected transport', async () => {
+  const {c, adapter, store, setDevices, disconnect, advance} = await fixture();
+  const wireless = {...phone, connection: 'wifi'};
+  setDevices([wireless]);
+  await c.setConnection('wifi');
+  assert.equal(adapter.connection, 'wifi');
+  assert.equal(store.data.preferences.connection, 'wifi');
+  await c.applyLocation(point);
+  assert.equal(store.data.session.connection, 'wifi');
+  await assert.rejects(c.setConnection('usb'), /Restore/);
+  await assert.rejects(c.connectWifi({platform: 'android', endpoint: '192.168.1.20:40567'}), /Restore/);
+  disconnect();
+  advance(6000); await c.scanDevices(); await c.scanDevices();
+  assert.equal(c.state.session.status, 'waiting');
+  setDevices([phone]); advance(6000); await c.scanDevices();
+  assert.notEqual(c.state.session.status, 'active');
+  setDevices([wireless]); advance(6000); await c.scanDevices();
+  assert.equal(c.state.session.status, 'active');
+  await c.stopLocation();
+  await c.setConnection('usb');
+  assert.equal(store.data.session, null);
+  assert.equal(adapter.connection, 'usb');
+});
+
+test('a changed Android Wi-Fi port does not erase an unresolved session as a different phone', async () => {
+  const previous = {...phone, id: 'android:192.168.1.20:40000', serial: '192.168.1.20:40000', connection: 'wifi'};
+  const {c, setDevices} = await fixture({session: {...previous, deviceId: previous.id, status: 'unknown'}, preferences: {...defaults().preferences, connection: 'wifi'}});
+  setDevices([{...previous, id: 'android:192.168.1.20:40001', serial: '192.168.1.20:40001'}]);
+  await c.scanDevices();
+  assert.equal(c.state.session.deviceId, previous.id);
+});
+
+test('a disconnected Android Wi-Fi session can reconnect through ADB before Restore', async () => {
+  const {c, adapter} = await fixture();
+  c.state.preferences.connection = 'wifi'; adapter.connection = 'wifi';
+  c.state.session = {...phone, deviceId: phone.id, connection: 'wifi', status: 'unknown'};
+  const calls = []; adapter.connectWifi = async input => calls.push(input.endpoint);
+  await c.connectWifi({platform: 'android', endpoint: '192.168.1.20:40001'});
+  assert.deepEqual(calls, ['192.168.1.20:40001']);
+  assert.equal(c.state.session.deviceId, phone.id);
+});

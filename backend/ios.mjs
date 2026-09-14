@@ -160,10 +160,10 @@ export class IosAdapter {
   }
 
   deviceParams(device) {
-    if (!device || device.platform !== 'ios' || device.connection !== 'usb' ||
+    if (!device || device.platform !== 'ios' || device.connection !== (this.connection || 'usb') ||
         typeof device.serial !== 'string' || !/^[A-Za-z0-9-]{8,80}$/.test(device.serial) ||
-        device.id !== `ios:${device.serial}`) throw new Error('Select a USB-connected iPhone first.');
-    return { udid: device.serial };
+        device.id !== `ios:${device.serial}`) throw new Error('Select an iPhone on the current USB or Wi-Fi connection.');
+    return { udid: device.serial, ...(device.connection === 'wifi' ? {connection: 'wifi'} : {}) };
   }
 
   async status() {
@@ -172,13 +172,17 @@ export class IosAdapter {
   }
   async list() {
     const age = this.now() - this.lastAcknowledgementAt;
-    if (this.cachedDevice && this.lastAcknowledgementAt !== null && age >= 0 && age <= 5000) {
+    if (this.cachedDevice && this.cachedDevice.connection === (this.connection || 'usb') && this.lastAcknowledgementAt !== null && age >= 0 && age <= 5000) {
       // A fresh reply on the persistent USB DVT stream is stronger evidence of
       // this selected phone's presence than another independent lockdown probe.
-      return [{ ...this.cachedDevice, state: 'ready', detail: 'USB connection confirmed by location command acknowledgements.' }];
+      return [{ ...this.cachedDevice, state: 'ready', detail: `${this.cachedDevice.connection === 'wifi' ? 'Wi-Fi' : 'USB'} connection confirmed by location command acknowledgements.` }];
     }
-    const devices = await this.request('discover');
-    return devices.filter((device) => device.platform === 'ios' && device.connection === 'usb');
+    const devices = await this.request('discover', {connection: this.connection || 'usb'});
+    return devices.filter((device) => device.platform === 'ios' && device.connection === (this.connection || 'usb'));
+  }
+  async enableWifi(device) {
+    if (device.connection !== 'usb') throw new Error('Connect this iPhone by USB to enable Wi-Fi.');
+    return this.request('enable-wifi', this.deviceParams(device), 60_000);
   }
   async prepare(device) { return this.request('prepare', this.deviceParams(device), 180000); }
   async set(device, { latitude, longitude, sessionId = null, reconnecting = false }) {

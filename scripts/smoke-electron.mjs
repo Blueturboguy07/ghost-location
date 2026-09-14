@@ -42,6 +42,14 @@ try {
     assert.equal(initial.runtime.android.available, true, initial.runtime.android.message);
   }
 
+  assert.equal(await page.evaluate(() => typeof window.ghost.connectWifi), 'function');
+  await page.evaluate(() => window.ghost.setConnection('wifi'));
+  await pollState(page, s => !s.busy && s.preferences.connection === 'wifi');
+  assert.equal((await page.evaluate(() => window.ghost.getState())).session, null);
+  await page.evaluate(() => window.ghost.setConnection('usb'));
+  await pollState(page, s => !s.busy && s.preferences.connection === 'usb');
+  console.log('Wi-Fi discovery IPC and return to USB passed without phone mutation.');
+
   async function chooseSetup(host, phone, expectedText, finish = true) {
     await page.locator(`[data-survey-host="${host}"]`).click();
     await page.locator(`[data-survey-phone="${phone}"]`).click();

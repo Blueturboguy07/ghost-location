@@ -2,7 +2,7 @@
   "listing": {
     "slug": "ghost",
     "name": "Ghost",
-    "tagline": "Set a phone location or follow a road route over USB",
+    "tagline": "Set a phone location or follow a route over USB or Wi-Fi",
     "category": "Productivity",
     "platform_badges": [
       {
@@ -14,7 +14,7 @@
         "label": "Windows"
       }
     ],
-    "requirements": "Mac (Apple chip or Intel) or Windows x64; USB data cable; iOS 17.4+ or Android 8+. Unsigned release. See tested scope in the guide.",
+    "requirements": "Mac (Apple chip or Intel) or Windows x64. USB: iOS 17.4+ or Android 8+. Wi-Fi: trusted iOS 17.4+ (initial USB setup), or Android 11+. Unsigned release; physical Wi-Fi testing pending.",
     "hero_image_url": "https://raw.githubusercontent.com/Blueturboguy07/ghost-location/main/docs/images/ghost-route.png",
     "mac_signature": "unsigned",
     "alternative_to": {
@@ -36,11 +36,11 @@
     "routes": {
       "macos": {
         "kind": "signed_download",
-        "assetName": "Ghost-0.1.5-mac-arm64.dmg"
+        "assetName": "Ghost-0.1.6-mac-arm64.dmg"
       },
       "windows": {
         "kind": "signed_download",
-        "assetName": "Ghost-0.1.5-win-x64.exe"
+        "assetName": "Ghost-0.1.6-win-x64.exe"
       }
     },
     "packageManager": "npm",
@@ -51,7 +51,7 @@
     "permissions": []
   },
   "sourceCommit": "cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f",
-  "tag": "v0.1.5",
-  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.5",
+  "tag": "v0.1.6",
+  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6",
   "alternativePriceVerifiedAt": "2026-09-13"
 }

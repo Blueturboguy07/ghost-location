@@ -369,3 +369,21 @@ test('clear, reset, session loss and disposal invalidate cached device presence 
     h.child.kill();
   }
 });
+
+test('Wi-Fi mode is explicit in discovery, set and restore requests', async () => {
+  const h = harness(); h.adapter.connection = 'wifi';
+  const wireless = {...device, connection: 'wifi'};
+  await assert.rejects(h.adapter.set(device, {latitude: 1, longitude: 2}), /connection/);
+  const listing = h.adapter.list(); await new Promise(setImmediate);
+  assert.equal(h.requests[0].params.connection, 'wifi');
+  h.reply(h.requests[0], [wireless, device]);
+  assert.deepEqual(await listing, [wireless]);
+  const setting = h.adapter.set(wireless, {latitude: 1, longitude: 2}); await new Promise(setImmediate);
+  assert.equal(h.requests[1].params.connection, 'wifi');
+  h.reply(h.requests[1], {applied: true}); await setting;
+  const clearing = h.adapter.clear(wireless); await new Promise(setImmediate);
+  assert.equal(h.requests[2].method, 'clear');
+  assert.equal(h.requests[2].params.connection, 'wifi');
+  h.reply(h.requests[2], {cleared: true}); await clearing;
+  h.child.kill();
+});

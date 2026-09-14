@@ -129,7 +129,7 @@ $('#app').innerHTML = `
       <div class="panel-scroll">
         <div class="panel-heading"><span class="eyebrow" id="panel-eyebrow">Location</span><h1 id="panel-title">Set a location</h1><p id="panel-subtitle">Choose a phone and a point on the map.</p></div>
         <div class="location-modes" role="group" aria-label="Location mode"><button data-location-mode="fixed" aria-pressed="true">Fixed location</button><button data-location-mode="route" aria-pressed="false">Route</button></div>
-        <section class="device-section" aria-labelledby="device-label"><div class="section-heading"><h2 id="device-label">Phone</h2><button id="scan-button" class="icon-button" aria-label="Refresh connected devices" title="Refresh connected devices">${icon('refresh-cw')}</button></div><div id="device-area"></div></section>
+        <section class="device-section" aria-labelledby="device-label"><div class="section-heading"><h2 id="device-label">Phone</h2><button id="scan-button" class="icon-button" aria-label="Refresh connected devices" title="Refresh connected devices">${icon('refresh-cw')}</button></div><div id="device-area"></div><button id="connection-options" class="setup-link">Connection: USB · Change</button></section>
         <section class="destination-section" aria-labelledby="destination-label">
           <div class="section-heading"><h2 id="destination-label">Destination</h2><button id="save-button" class="icon-button" aria-label="Save selected place" title="Save selected place" disabled>${icon('bookmark')}</button></div>
           <div id="destination-summary"></div>
@@ -158,12 +158,43 @@ $('#app').innerHTML = `
     <div class="setup-note">${icon('cable')}<span>Keep the cable connected while a location is active. Restore real location before unplugging when possible.</span></div><div class="dialog-actions"><button id="change-configuration" class="secondary-button">Change setup</button><button id="setup-scan" class="primary-button"><span>Check for my phone</span>${icon('refresh-cw')}</button></div><div id="setup-detection" class="setup-detection" role="status"></div>
   </dialog>
 
+  <dialog id="wifi-dialog" class="sheet-dialog" aria-labelledby="wifi-title">
+    <div class="sheet-heading"><div><span class="eyebrow">Phone connection</span><h2 id="wifi-title">Connect over Wi-Fi</h2></div><button class="icon-button" data-close="wifi-dialog" aria-label="Close connection settings">${icon('x')}</button></div>
+    <p class="sheet-intro">Keep your phone and computer on the same Wi-Fi network. Restore the current location before changing connections.</p>
+    <div class="location-modes" role="group" aria-label="Connection method"><button data-connection="usb">USB cable</button><button data-connection="wifi">Wi-Fi</button></div>
+    <p id="wifi-status" class="settings-note" role="status"></p>
+    <label class="field-label" for="wifi-phone">Your phone</label><select id="wifi-phone" class="text-input"><option value="ios">iPhone · iOS 17.4+</option><option value="android">Android · Android 11+</option></select>
+    <div id="wifi-ios" class="settings-group">
+      <h3>Pair once by cable</h3>
+      <ol class="wifi-steps"><li>Choose USB cable above. Connect and unlock your iPhone, trust this computer and enable Developer Mode. On Windows, install Apple Devices first.</li><li>Select your iPhone in the main Phone menu, then return here and enable Wi-Fi.</li><li>Choose Wi-Fi above. Wait for the phone to appear, then unplug the cable. You can now set a location or start a route.</li></ol>
+      <button id="enable-iphone-wifi" class="secondary-button">Enable Wi-Fi for selected iPhone</button>
+      <p class="settings-note">If discovery fails, enable “Show this iPhone when on Wi-Fi” in Finder on Mac, or “Show this device when on Wi-Fi” in Apple Devices on Windows, and apply. Unlock the phone and refresh.</p>
+    </div>
+    <div id="wifi-android" class="settings-group" hidden>
+      <h3>Pair with Wireless debugging</h3>
+      <p class="settings-note">Choose Wi-Fi above. On Android 11 or later, enable Developer options (tap Build number seven times), then open Wireless debugging → Pair device with pairing code. Keep this screen open. No USB cable is needed.</p>
+      <form id="wifi-pair-form" class="wifi-form">
+        <label class="field-label" for="wifi-pair-address">Pairing IP address and port</label><input id="wifi-pair-address" class="text-input" placeholder="192.168.1.20:37123" autocomplete="off" required />
+        <label class="field-label" for="wifi-pair-code">Six-digit pairing code</label><input id="wifi-pair-code" class="text-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="off" required />
+        <button id="wifi-pair-button" type="submit" class="secondary-button">Pair phone</button>
+      </form>
+      <form id="wifi-connect-form" class="wifi-form">
+        <label class="field-label" for="wifi-connect-address">Connection IP address and port</label><input id="wifi-connect-address" class="text-input" placeholder="192.168.1.20:40567" autocomplete="off" required />
+        <p class="settings-note">After pairing, go back to the main Wireless debugging screen and use its IP address and port here. This port is different from the pairing port and may change after reconnecting.</p>
+        <button id="wifi-connect-button" type="submit" class="secondary-button">Connect paired phone</button>
+      </form>
+      <p class="settings-note">Once connected, close this panel and choose Prepare if needed. Keep Location on and select Appium Settings as the mock location app. Android 8–10 uses USB.</p>
+    </div>
+    <p class="settings-note">Allow Ghost and its device tools through your computer’s local-network/firewall prompts. Guest Wi-Fi, client isolation and some VPNs can prevent devices from finding each other. Keep Ghost open; restore real location before disconnecting.</p>
+    <div class="dialog-actions"><button id="wifi-refresh" class="primary-button">Refresh phones</button></div>
+  </dialog>
+
   <dialog id="settings-dialog" class="sheet-dialog" aria-labelledby="settings-title">
     <div class="sheet-heading"><div><span class="eyebrow">Ghost</span><h2 id="settings-title">Settings</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">${icon('x')}</button></div>
     <div class="settings-group"><h3>Device setup</h3><div class="configuration-row"><div><strong id="settings-configuration">No setup selected</strong><small>Ghost uses this to show the right connection steps.</small></div><button id="rerun-onboarding" class="secondary-button compact">Change</button></div></div>
     <div class="settings-group"><h3>Location sessions</h3><label class="setting-row"><span><strong>Restore on quit</strong><small>Ghost tries to stop location simulation before it closes. Keep the phone connected.</small></span><input id="restore-preference" type="checkbox" class="switch" /></label></div>
     <div class="settings-group"><h3>Device tools</h3><div id="runtime-status"></div><button id="install-runtime" class="secondary-button">${icon('download')} Prepare device tools</button><p class="settings-note">First-time preparation may need an internet connection.</p></div>
-    <form id="provider-form" class="settings-group"><h3>Place search</h3><label class="field-label" for="provider-url">Photon-compatible endpoint</label><input id="provider-url" class="text-input" type="url" required placeholder="https://photon.komoot.io/api/" /><p class="settings-note">Search runs only when you submit. Map tiles come from OpenStreetMap.</p><div class="button-row"><button type="submit" class="secondary-button compact">Save endpoint</button><button id="reset-provider" type="button" class="text-button">Reset</button></div></form><div class="settings-footer">Ghost 0.1.5 · Free and open source</div>
+    <form id="provider-form" class="settings-group"><h3>Place search</h3><label class="field-label" for="provider-url">Photon-compatible endpoint</label><input id="provider-url" class="text-input" type="url" required placeholder="https://photon.komoot.io/api/" /><p class="settings-note">Search runs only when you submit. Map tiles come from OpenStreetMap.</p><div class="button-row"><button type="submit" class="secondary-button compact">Save endpoint</button><button id="reset-provider" type="button" class="text-button">Reset</button></div></form><div class="settings-footer">Ghost 0.1.6 · Free and open source</div>
   </dialog>
 
   <dialog id="save-dialog" class="small-dialog" aria-labelledby="save-title"><div class="sheet-heading"><div><span class="eyebrow">Saved place</span><h2 id="save-title">Save this place</h2></div><button class="icon-button" data-close="save-dialog" aria-label="Close save place">${icon('x')}</button></div><form id="save-form"><label class="field-label" for="place-name">Name</label><input id="place-name" class="text-input" maxlength="120" required placeholder="Place name" /><input id="place-id" type="hidden" /><p id="save-coordinates" class="settings-note"></p><button class="primary-button" type="submit"><span>Save place</span>${icon('bookmark')}</button></form></dialog>
@@ -260,14 +291,14 @@ function renderDevices() {
   $('#scan-button').classList.toggle('spinning', pending);
   if (document.activeElement === $('#device-select')) return;
   if (!state.devices.length) {
-    setContent('#device-area', `<button class="device-empty" id="connect-device">${icon('smartphone')}<span><strong>Connect your phone</strong><small>Use a USB data cable</small></span>${icon('arrow-right')}</button><button id="open-setup" class="setup-link">Open the setup guide</button>`);
+    setContent('#device-area', `<button class="device-empty" id="connect-device">${icon('smartphone')}<span><strong>Connect your phone</strong><small>${state.preferences.connection === 'wifi' ? 'Pair on the same Wi-Fi network' : 'Use a USB data cable'}</small></span>${icon('arrow-right')}</button><button id="open-setup" class="setup-link">Open the setup guide</button>`);
     $('#connect-device').onclick = openSetup;
     $('#open-setup').onclick = openSetup;
     return;
   }
   const device = selectedDevice || state.devices[0];
   const deviceStatus = { ready: 'Ready', 'setup-required': 'Setup needed', unauthorized: 'Trust this computer', offline: 'Disconnected' }[device.state] || 'Check connection';
-  setContent('#device-area', `<div class="device-card ${device.state === 'ready' ? 'ready' : ''}"><div class="device-card-top">${icon('smartphone')}<div class="device-select-wrap"><label class="sr-only" for="device-select">Connected phone</label><select id="device-select">${state.devices.map((phone) => `<option value="${esc(phone.id)}" ${phone.id === selectedDeviceId ? 'selected' : ''}>${esc(phone.name || platformName(phone.platform))}</option>`).join('')}</select><span>${esc(platformName(device.platform))}${device.osVersion ? ` ${esc(device.osVersion)}` : ''} · USB</span></div>${icon('chevron-down')}</div><div class="device-card-state"><span class="status-dot"></span><span>${deviceStatus}</span>${device.state === 'ready' ? icon('check') : `<button id="prepare-device" class="text-button" ${pending ? 'disabled' : ''}>${device.state === 'setup-required' ? 'Prepare' : 'Help'} ${icon('arrow-right')}</button>`}</div></div>${device.detail ? `<p class="device-detail">${esc(device.detail)}</p>` : ''}`);
+  setContent('#device-area', `<div class="device-card ${device.state === 'ready' ? 'ready' : ''}"><div class="device-card-top">${icon('smartphone')}<div class="device-select-wrap"><label class="sr-only" for="device-select">Connected phone</label><select id="device-select">${state.devices.map((phone) => `<option value="${esc(phone.id)}" ${phone.id === selectedDeviceId ? 'selected' : ''}>${esc(phone.name || platformName(phone.platform))}</option>`).join('')}</select><span>${esc(platformName(device.platform))}${device.osVersion ? ` ${esc(device.osVersion)}` : ''} · ${device.connection === 'wifi' ? 'Wi-Fi' : 'USB'}</span></div>${icon('chevron-down')}</div><div class="device-card-state"><span class="status-dot"></span><span>${deviceStatus}</span>${device.state === 'ready' ? icon('check') : `<button id="prepare-device" class="text-button" ${pending ? 'disabled' : ''}>${device.state === 'setup-required' ? 'Prepare' : 'Help'} ${icon('arrow-right')}</button>`}</div></div>${device.detail ? `<p class="device-detail">${esc(device.detail)}</p>` : ''}`);
   $('#device-select').onchange = (event) => { selectedDeviceId = event.target.value; render(); };
   $('#device-select').onblur = () => { renderDevices(); paintIcons(); };
   if ($('#prepare-device')) $('#prepare-device').onclick = () => {
@@ -296,7 +327,7 @@ function renderActions() {
   const label = pendingAction === 'restore' ? 'Stopping…' : status === 'reconnecting' ? 'Reconnecting…' : busy ? 'Working…' : reconnectIOS || (retry && status === 'waiting') ? 'Reconnect & set location' : retry ? 'Retry location' : status === 'active' ? 'Update location' : 'Set location';
   $('#apply-button').disabled = busy || !selectedPlace || !canApply || Boolean(otherSession);
   setContent('#apply-button', `<span>${label}</span>${icon(busy ? 'loader-circle' : retry ? 'refresh-cw' : 'arrow-up-right', busy ? 'spin' : '')}`);
-  $('#apply-hint').textContent = pendingAction === 'restore' ? 'Stopping automatic retry and requesting real location.' : status === 'reconnecting' ? 'Reconnecting to the same phone. Keep the cable connected.' : busy ? 'Keep your phone connected.' : otherSession ? 'Restore the current session before switching phones.' : !device || device.state === 'offline' ? state.session ? 'Reconnect the same phone by USB to continue.' : 'Connect a phone to get started.' : reconnectIOS ? 'Reconnect and apply this pin to the same iPhone.' : device.state !== 'ready' ? 'Finish device setup to set a location.' : !selectedPlace ? 'Choose a destination on the map.' : retry ? 'Retry this pin on the same phone, or restore real location.' : 'Your phone changes only when you press this button.';
+  $('#apply-hint').textContent = pendingAction === 'restore' ? 'Stopping automatic retry and requesting real location.' : status === 'reconnecting' ? 'Reconnecting to the same phone. Keep your phone connected.' : busy ? 'Keep your phone connected.' : otherSession ? 'Restore the current session before switching phones.' : !device || device.state === 'offline' ? state.session ? 'Reconnect the same phone to continue.' : 'Connect a phone to get started.' : reconnectIOS ? 'Reconnect and apply this pin to the same iPhone.' : device.state !== 'ready' ? 'Finish device setup to set a location.' : !selectedPlace ? 'Choose a destination on the map.' : retry ? 'Retry this pin on the same phone, or restore real location.' : 'Your phone changes only when you press this button.';
   $('#restore-button').disabled = !state.session || pending || (busy && status !== 'reconnecting');
   setContent('#restore-button', `${icon(pendingAction === 'restore' ? 'loader-circle' : 'rotate-ccw', pendingAction === 'restore' ? 'spin' : '')} ${pendingAction === 'restore' ? 'Stopping simulation…' : 'Restore real location'}`);
 }
@@ -388,7 +419,7 @@ function renderSession() {
   const recovering = ['waiting', 'unknown', 'error'].includes(session?.status);
   const recoveryText = recovering ? `<span class="session-recovery">${session.autoReconnect ? 'Ghost will retry this phone automatically. Restore cancels retry.' : 'Reconnect this phone, then retry or restore.'}</span>` : '';
   const statusIcon = session?.status === 'reconnecting' ? 'refresh-cw' : session ? ['unknown', 'error', 'waiting'].includes(session.status) ? 'help-circle' : 'map-pin' : 'circle';
-  setContent('#session-status', `<span class="session-status-icon">${icon(statusIcon, session?.status === 'reconnecting' ? 'spin' : '')}</span><div><strong>${session ? session.status === 'active' && state.route ? ({ running: 'Following route · 45 mph', paused: 'Route paused', completed: 'Arrived', starting: 'Starting route…' }[state.route.status]) : labels[session.status] || 'Session needs attention' : 'Ready'}</strong><span>${esc(state.route?.message || session?.message || (session ? session.label || 'Keep your phone connected over USB.' : state.devices.some((device) => device.state === 'ready') ? 'Choose a place to begin.' : 'Connect a phone and choose a place.'))}</span>${recoveryText}${refreshText}</div>${session?.status === 'active' ? '<span class="live-tag"><span></span>Active</span>' : ''}`);
+  setContent('#session-status', `<span class="session-status-icon">${icon(statusIcon, session?.status === 'reconnecting' ? 'spin' : '')}</span><div><strong>${session ? session.status === 'active' && state.route ? ({ running: 'Following route · 45 mph', paused: 'Route paused', completed: 'Arrived', starting: 'Starting route…' }[state.route.status]) : labels[session.status] || 'Session needs attention' : 'Ready'}</strong><span>${esc(state.route?.message || session?.message || (session ? session.label || 'Keep your phone connected.' : state.devices.some((device) => device.state === 'ready') ? 'Choose a place to begin.' : 'Connect a phone and choose a place.'))}</span>${recoveryText}${refreshText}</div>${session?.status === 'active' ? '<span class="live-tag"><span></span>Active</span>' : ''}`);
 }
 
 function renderRuntime() {
@@ -419,7 +450,7 @@ function renderSetup() {
 function renderOnboarding() {
   $('#onboarding-progress').textContent = onboardingStep === 'survey' ? '1 of 2' : '2 of 2';
   if (onboardingStep === 'survey') {
-    setContent('#onboarding-content', `<div class="onboarding-copy"><span class="eyebrow">Welcome to Ghost</span><h1 id="onboarding-title">Let’s set up your devices.</h1><p>Choose your computer and phone. Ghost will show the exact USB setup for that combination.</p></div><div class="survey-group"><h2>This computer</h2><div class="choice-grid"><button class="choice-card" data-survey-host="mac" aria-pressed="${surveyHost === 'mac'}">${icon('laptop')}<span><strong>Mac</strong><small>macOS</small></span>${icon('check', 'choice-check')}</button><button class="choice-card" data-survey-host="windows" aria-pressed="${surveyHost === 'windows'}">${icon('monitor')}<span><strong>Windows PC</strong><small>Windows 10 or 11</small></span>${icon('check', 'choice-check')}</button></div></div><div class="survey-group"><h2>Your phone</h2><div class="choice-grid"><button class="choice-card" data-survey-phone="ios" aria-pressed="${surveyPhone === 'ios'}">${icon('smartphone')}<span><strong>iPhone</strong><small>iOS 17.4 or later</small></span>${icon('check', 'choice-check')}</button><button class="choice-card" data-survey-phone="android" aria-pressed="${surveyPhone === 'android'}">${icon('smartphone')}<span><strong>Android</strong><small>Android 8 or later</small></span>${icon('check', 'choice-check')}</button></div></div><div class="onboarding-actions"><span>Your choices stay on this computer.</span><button id="onboarding-next" class="primary-button inline" ${!surveyHost || !surveyPhone ? 'disabled' : ''}><span>Continue</span>${icon('arrow-right')}</button></div>`);
+    setContent('#onboarding-content', `<div class="onboarding-copy"><span class="eyebrow">Welcome to Ghost</span><h1 id="onboarding-title">Let’s set up your devices.</h1><p>Choose your computer and phone. Ghost will show the USB setup for that combination. For wireless setup, choose Connection → Wi-Fi on the map.</p></div><div class="survey-group"><h2>This computer</h2><div class="choice-grid"><button class="choice-card" data-survey-host="mac" aria-pressed="${surveyHost === 'mac'}">${icon('laptop')}<span><strong>Mac</strong><small>macOS</small></span>${icon('check', 'choice-check')}</button><button class="choice-card" data-survey-host="windows" aria-pressed="${surveyHost === 'windows'}">${icon('monitor')}<span><strong>Windows PC</strong><small>Windows 10 or 11</small></span>${icon('check', 'choice-check')}</button></div></div><div class="survey-group"><h2>Your phone</h2><div class="choice-grid"><button class="choice-card" data-survey-phone="ios" aria-pressed="${surveyPhone === 'ios'}">${icon('smartphone')}<span><strong>iPhone</strong><small>iOS 17.4 or later</small></span>${icon('check', 'choice-check')}</button><button class="choice-card" data-survey-phone="android" aria-pressed="${surveyPhone === 'android'}">${icon('smartphone')}<span><strong>Android</strong><small>Android 8 or later</small></span>${icon('check', 'choice-check')}</button></div></div><div class="onboarding-actions"><span>Your choices stay on this computer.</span><button id="onboarding-next" class="primary-button inline" ${!surveyHost || !surveyPhone ? 'disabled' : ''}><span>Continue</span>${icon('arrow-right')}</button></div>`);
     document.querySelectorAll('[data-survey-host]').forEach((button) => { button.onclick = () => { surveyHost = button.dataset.surveyHost; renderOnboarding(); paintIcons(); }; });
     document.querySelectorAll('[data-survey-phone]').forEach((button) => { button.onclick = () => { surveyPhone = button.dataset.surveyPhone; renderOnboarding(); paintIcons(); }; });
     $('#onboarding-next').onclick = () => { if (surveyHost && surveyPhone) { onboardingStep = 'guide'; onboardingChecks.clear(); renderOnboarding(); paintIcons(); } };
@@ -447,7 +478,24 @@ function renderView() {
   $('#panel-subtitle').textContent = showingSaved ? 'Select a place to return to the map.' : locationMode === 'route' ? 'Choose stops. Move along the road at 45 mph.' : 'Choose a phone and a point on the map.';
 }
 
-function render() { renderView(); renderDevices(); renderDestination(); renderActions(); renderRoute(); renderSaved(); renderSession(); renderRuntime(); renderSetup(); if ($('#onboarding-dialog').open) renderOnboarding(); paintIcons(); }
+function renderConnections() {
+  const mode = state.preferences.connection || 'usb';
+  const blocked = pending || state.busy || Boolean(state.session);
+  $('#connection-options').textContent = `Connection: ${mode === 'wifi' ? 'Wi-Fi' : 'USB'} · Change`;
+  document.querySelectorAll('[data-connection]').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.connection === mode));
+    button.disabled = blocked;
+  });
+  $('#wifi-status').textContent = state.session ? 'Restore real location before changing connection methods. A disconnected Android phone can be reconnected below.' : pending || state.busy ? 'Checking the connection…' : `Using ${mode === 'wifi' ? 'Wi-Fi' : 'USB'}. ${state.devices.length} phone${state.devices.length === 1 ? '' : 's'} found.`;
+  $('#enable-iphone-wifi').disabled = blocked || mode !== 'usb' || state.devices.find(device => device.id === selectedDeviceId)?.platform !== 'ios';
+  const recoveringAndroid = state.session?.platform === 'android' && state.session?.connection === 'wifi' && ['waiting', 'unknown', 'error'].includes(state.session?.status);
+  $('#wifi-pair-button').disabled = $('#wifi-connect-button').disabled = pending || state.busy || (Boolean(state.session) && !recoveringAndroid) || mode !== 'wifi';
+  $('#wifi-refresh').disabled = pending || state.busy;
+  $('#wifi-ios').hidden = $('#wifi-phone').value !== 'ios';
+  $('#wifi-android').hidden = $('#wifi-phone').value !== 'android';
+}
+
+function render() { renderConnections(); renderView(); renderDevices(); renderDestination(); renderActions(); renderRoute(); renderSaved(); renderSession(); renderRuntime(); renderSetup(); if ($('#onboarding-dialog').open) renderOnboarding(); paintIcons(); }
 
 function openOnboarding() {
   surveyHost = state.preferences.hostPlatform || detectedHost;
@@ -461,6 +509,7 @@ function openOnboarding() {
 }
 
 function openSetup() {
+  if (state.preferences.connection === 'wifi') { $('#connection-options').click(); return; }
   if (!state.preferences.hostPlatform || !state.preferences.phonePlatform) { openOnboarding(); return; }
   setupHost = state.preferences.hostPlatform;
   setupPlatform = state.preferences.phonePlatform;
@@ -537,6 +586,29 @@ document.querySelectorAll('dialog').forEach((dialog) => dialog.addEventListener(
   if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close(); }
 }));
 $('#onboarding-dialog').addEventListener('cancel', (event) => { if (state.preferences.onboardingComplete !== true) event.preventDefault(); });
+
+$('#connection-options').onclick = () => {
+  $('#wifi-phone').value = setupPlatform || 'ios';
+  renderConnections();
+  $('#wifi-dialog').showModal();
+};
+$('#wifi-phone').onchange = renderConnections;
+$('#wifi-dialog').addEventListener('close', () => { $('#wifi-pair-code').value = ''; });
+document.querySelectorAll('[data-connection]').forEach(button => {
+  button.onclick = () => runOperation(() => api.setConnection(button.dataset.connection));
+});
+$('#enable-iphone-wifi').onclick = () => runOperation(() => api.connectWifi({platform: 'ios', deviceId: selectedDeviceId}), 'Wi-Fi enabled. Choose Wi-Fi above to find your iPhone.');
+$('#wifi-pair-form').onsubmit = async event => {
+  event.preventDefault();
+  const code = $('#wifi-pair-code').value;
+  $('#wifi-pair-code').value = '';
+  await runOperation(() => api.connectWifi({platform: 'android', endpoint: $('#wifi-pair-address').value.trim(), code}), 'Paired. Now connect using the port on the main Wireless debugging screen.');
+};
+$('#wifi-connect-form').onsubmit = event => {
+  event.preventDefault();
+  runOperation(() => api.connectWifi({platform: 'android', endpoint: $('#wifi-connect-address').value.trim()}), 'Connected. Close this panel and select your phone.');
+};
+$('#wifi-refresh').onclick = () => runOperation(() => api.scanDevices());
 
 $('#search-form').onsubmit = async (event) => {
   event.preventDefault();

@@ -162,6 +162,35 @@ try {
   await page.locator('#route-play').scrollIntoViewIfNeeded();
   await page.screenshot({path: path.join(artifacts, 'ghost-route-compact.png')});
   console.log('PASS: route stop selection, planning without device mutation, start/pause/resume, moving dot, and compact controls.');
+  // Pairing drafts must survive state pushes, and secrets disappear on submit.
+  await page.locator('#connection-options').click();
+  assert.equal(await page.locator('[data-connection="wifi"]').isDisabled(), true, 'An active route must prevent transport switches.');
+  await page.evaluate(() => window.ghostFixture.setState({session: null, route: null, devices: []}));
+  await page.locator('[data-connection="wifi"]').click();
+  await page.locator('#wifi-phone').selectOption('android');
+  await page.locator('#wifi-pair-address').fill('192.168.1.20:37123');
+  await page.locator('#wifi-pair-code').fill('123456');
+  await page.evaluate(() => window.ghostFixture.setState({warning: null}));
+  assert.equal(await page.locator('#wifi-pair-code').inputValue(), '123456');
+  assert.equal(await page.locator('#wifi-pair-address').inputValue(), '192.168.1.20:37123');
+  await page.locator('#wifi-pair-button').click();
+  assert.equal(await page.locator('#wifi-pair-code').inputValue(), '');
+  await page.locator('#wifi-connect-address').fill('192.168.1.20:40567');
+  await page.locator('#wifi-connect-button').click();
+  await page.waitForFunction(() => !document.querySelector('#wifi-connect-button').disabled);
+  const wifiCalls = (await page.evaluate(() => window.ghostFixture.getCalls())).filter(call => ['setConnection', 'connectWifi'].includes(call.method));
+  assert.deepEqual(wifiCalls, [
+    {method: 'setConnection', connection: 'wifi'},
+    {method: 'connectWifi', platform: 'android', endpoint: '192.168.1.20:37123', code: '123456'},
+    {method: 'connectWifi', platform: 'android', endpoint: '192.168.1.20:40567'},
+  ]);
+  await page.locator('#wifi-title').scrollIntoViewIfNeeded();
+  await page.screenshot({path: path.join(artifacts, 'ghost-wifi-android.png')});
+  await page.locator('#wifi-phone').selectOption('ios');
+  await page.screenshot({path: path.join(artifacts, 'ghost-wifi-iphone.png')});
+  await page.getByRole('button', {name: 'Close connection settings', exact: true}).click();
+  assert.match(await page.locator('#connection-options').textContent(), /Wi-Fi/);
+  console.log('PASS: Wi-Fi dialog, active-session transport guard, separate Android pairing/connect ports, persistent drafts and pairing-code cleanup.');
   assert.deepEqual(rendererErrors, [], 'The renderer raised an error.');
   const blockedRequests = await application.evaluate(() => globalThis.ghostRendererFixture.blockedRequests);
   assert.ok(blockedRequests > 0, 'The fixture did not demonstrate that external map requests were blocked.');
