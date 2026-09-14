@@ -158,3 +158,11 @@ Publik’s existing guide/assembler/submission test selection passed 152 tests. 
 - Isolated Electron UI rehearsal passes: the Wi-Fi offer appears for an active USB session on host Wi-Fi, stays dismissed across heartbeats, and an active route can switch. Manual Android pairing drafts and code cleanup still pass.
 - The rebuilt macOS arm64 bundle in `release/local-017/mac-arm64/Ghost.app` passes native smoke checks with temporary settings, both bundled runtimes, read-only Wi-Fi discovery, live search/routing and no phone location commands. Actual host Wi-Fi detection also returns true.
 - Physical phone handoff remains unverified. The controller's recovery tests simulate transport failures; they do not establish continuity on a real phone during a transport change.
+
+### 0.1.7 release publication
+
+- Release source: `dd77694624c22fd91bc89c41ff91ee32af756e47`; [native build run](https://github.com/Blueturboguy07/ghost-location/actions/runs/34830210457) passed on Windows x64, macOS arm64 and macOS x64.
+- Windows exposed a pre-existing test that required four refresh calls within 40 ms. The tests now wait for observed refreshes with a two-second deadline, preserving the assertions without relying on host timer granularity. All 133 tests (including 22 Python bridge tests) pass across the native builds.
+- The actual CI Apple Silicon bundle also passes isolated native smoke checks. Both local Mac archives verify successfully. Physical Wi-Fi handoff remains unverified.
+- All five public installers and SHA256SUMS.txt match the CI files and return successful download responses. GitHub 0.1.7 is the latest release.
+- Publik's approved guide v3 pins the same source, and the live Mac/Windows install pages show 0.1.7 and Switch to Wi-Fi. The platform chooser links to both guides. Targeted cache invalidation refreshed only Ghost pages; the GhostMe $12.95/month comparison remains present.
