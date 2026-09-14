@@ -9,6 +9,13 @@ import ios_bridge as bridge_module
 
 
 class BridgeTests(unittest.IsolatedAsyncioTestCase):
+    async def wait_until(self, predicate):
+        # Windows timers can have a 15 ms granularity. Assert completion, not
+        # how many 5 ms sleeps a loaded CI host happens to fit into 40 ms.
+        async with asyncio.timeout(2):
+            while not predicate():
+                await asyncio.sleep(0.005)
+
     def connected_bridge(self, **kwargs):
         bridge = bridge_module.Bridge(**kwargs)
         disconnected = asyncio.Event()
@@ -155,7 +162,7 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["sessionId"], "new")
             self.assertEqual(result["refreshCount"], 1)
             emit.reset_mock()
-            await asyncio.sleep(0.035)
+            await self.wait_until(lambda: len(emit.call_args_list) >= 2)
             await bridge.close_session(False)
             self.assertTrue(emit.called)
             self.assertTrue(all(call.args[0]["sessionId"] == "new" for call in emit.call_args_list))
@@ -256,7 +263,7 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
             await bridge.dispatch("set", {"udid": "phone", "latitude": 1, "longitude": 2})
             listing = asyncio.create_task(bridge.dispatch("discover", {}))
             await discovery_started.wait()
-            await asyncio.sleep(0.03)
+            await self.wait_until(lambda: session["location"].set.await_count > 1)
             self.assertGreater(session["location"].set.await_count, 1)
             self.assertFalse(listing.done())
             discovery_reply.set()
@@ -312,7 +319,7 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         bridge, session, _ = self.connected_bridge(refresh_interval=0.005)
         with patch.object(bridge_module, "emit"):
             await bridge.dispatch("set", {"udid": "phone", "connection": "wifi", "latitude": 1, "longitude": 2})
-            await asyncio.sleep(0.04)
+            await self.wait_until(lambda: session["location"].set.await_count >= 4)
             self.assertGreaterEqual(session["location"].set.await_count, 4)
             await bridge.dispatch("set", {"udid": "phone", "connection": "wifi", "latitude": 3, "longitude": 4})
             await asyncio.sleep(0.02)
@@ -342,7 +349,7 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(bridge_module, "emit"), patch.object(bridge_module, "usb_lockdown", AsyncMock(return_value=lockdown)):
             await bridge.dispatch("set", {"udid": "phone", "latitude": 1, "longitude": 2})
             await bridge.dispatch("enable-wifi", {"udid": "phone"})
-            await asyncio.sleep(0.03)
+            await self.wait_until(lambda: session["location"].set.await_count >= 3)
             self.assertIs(bridge.session, session)
             self.assertGreaterEqual(session["location"].set.await_count, 3)
             session["location"].clear.assert_not_awaited()
