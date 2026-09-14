@@ -141,5 +141,13 @@ Publik’s existing guide/assembler/submission test selection passed 152 tests. 
 - iPhone and Android route controller tests pass over both connection modes: one update per second, 45 mph, stable session, exact arrival point and restoration.
 - Isolated Electron renderer rehearsal passes fixed-location heartbeats, route controls, connection mode controls, pairing/connect form dispatch, drafts surviving state updates and code clearing after submit. It loads no device adapters and blocks network requests.
 - macOS arm64 sidecar rebuilt from the changed bridge; frozen runtime protocol smoke, resource provenance checks, and the packaged 0.1.6 `Ghost.app` smoke pass. The packaged app exercises real Wi-Fi discovery IPC and switches back to USB using temporary settings. Both bundled runtimes report available. No phone location commands were sent.
-- **Physical Wi-Fi Set / route / Restore has not been tested.** Windows and Intel Mac 0.1.6 builds have not been run in this workspace. These checks establish implementation and local packaging behavior, not all four host/phone hardware combinations.
-- The local 0.1.6 bundle is in `release/mac-arm64/Ghost.app`. Publik and GitHub release downloads remain at 0.1.5 until a new release is published.
+- **Physical Wi-Fi Set / route / Restore has not been tested.** Native GitHub CI for 0.1.6 passed on Windows x64, macOS arm64 and macOS x64. These checks establish implementation and local packaging behavior, not all four host/phone hardware combinations.
+- The local 0.1.6 bundle is in `release/mac-arm64/Ghost.app`. GitHub and Publik now publish 0.1.6; Publik guide v2 includes USB and Wi-Fi setup.
+
+
+### 0.1.6 release publication
+
+- Release source: `211ad6764081eeb2c1d18bbd9e8d996afa90f6fc`; [native build run](https://github.com/Blueturboguy07/ghost-location/actions/runs/34826878968) passed on all three targets.
+- The five CI-built installers were uploaded with `SHA256SUMS.txt`. Uploaded SHA-256 digests match the downloaded CI artifacts; both Mac DMGs and ZIPs pass integrity checks.
+- The actual CI-built Apple Silicon app passed isolated native UI, bundled-runtime, Wi-Fi discovery IPC, search and route planning checks without sending location commands to a phone.
+- [GitHub 0.1.6](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6) is the latest release. Publik's approved release points to the same source and its v2 guide covers Wi-Fi on Mac and Windows. The GhostMe $12.95/month comparison is preserved.

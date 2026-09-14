@@ -40,7 +40,7 @@
         },
         {
           "id": "unsigned-launch",
-          "body": "If blocked, try Privacy & Security \u2192 Open Anyway. For \u201cdamaged\u201d, follow the checksum guide.",
+          "body": "If blocked, try Privacy & Security → Open Anyway. For “damaged”, follow the checksum guide.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#download-and-open",
           "kind": "open",
           "title": "Open this unsigned release",
@@ -64,17 +64,17 @@
         },
         {
           "id": "choose-configuration",
-          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost\u2019s first-run survey.",
+          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost’s first-run survey.",
           "kind": "permission",
           "title": "Choose your computer and phone",
           "verifierLabel": "The checklist matches your computer and phone"
         },
         {
           "id": "phone-settings",
-          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options; choose USB or Wireless debugging.",
+          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options and debugging.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#mac--iphone",
           "kind": "open",
-          "title": "Prepare your phone\u2019s settings",
+          "title": "Prepare your phone’s settings",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -121,14 +121,14 @@
           "id": "choose-connection",
           "kind": "permission",
           "title": "Choose USB or Wi-Fi",
-          "body": "Below Phone, open Connection \u2192 Change. Keep USB, or follow the Wi-Fi steps for your phone.",
+          "body": "Below Phone, open Connection → Change. Keep USB, or follow the Wi-Fi steps for your phone.",
           "verifierLabel": "Your connection method is selected"
         },
         {
           "id": "iphone-wifi",
           "kind": "permission",
           "title": "iPhone Wi-Fi: trust once over USB",
-          "body": "Select the USB iPhone. Click Enable Wi-Fi for selected iPhone. Choose Wi-Fi; wait for it before unplugging.",
+          "body": "Select the USB iPhone; enable Wi-Fi in Ghost. Choose Wi-Fi and wait for it before unplugging.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -139,7 +139,7 @@
           "id": "android-wifi-pair",
           "kind": "permission",
           "title": "Android Wi-Fi: pair with a code",
-          "body": "Android 11+: open Wireless debugging \u2192 Pair device with pairing code. Enter that address, port and code in Ghost.",
+          "body": "Android 11+: Wireless debugging → Pair device with pairing code. Enter details and click Pair phone.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -150,7 +150,7 @@
           "id": "android-wifi-connect",
           "kind": "permission",
           "title": "Android Wi-Fi: connect the paired phone",
-          "body": "Use the IP address and port from the main Wireless debugging screen. Its port differs from the pairing port.",
+          "body": "Use the main Wireless debugging IP/port, then Connect paired phone. The pairing port differs.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -181,7 +181,7 @@
           "id": "android-mock-provider",
           "body": "Android only: allow Appium Settings location access and select it as the mock location app.",
           "kind": "permission",
-          "title": "Check Android\u2019s location helper",
+          "title": "Check Android’s location helper",
           "verifierLabel": "Android is ready, or you are using iPhone"
         },
         {
@@ -210,12 +210,12 @@
           "id": "verify-phone-location",
           "body": "On the phone, allow map location access and tap current location. Confirm the selected area.",
           "kind": "verify",
-          "title": "Check the phone\u2019s map",
-          "verifierLabel": "The phone\u2019s map shows your chosen location"
+          "title": "Check the phone’s map",
+          "verifierLabel": "The phone’s map shows your chosen location"
         },
         {
           "id": "restore-before-route",
-          "body": "Click Restore real location. Wait for the phone\u2019s map to refresh.",
+          "body": "Click Restore real location. Wait for the phone’s map to refresh.",
           "kind": "permission",
           "point": {
             "inApp": "org.ghostlocation.desktop",
@@ -248,11 +248,11 @@
         },
         {
           "id": "start-route",
-          "body": "Click Start route \u00b7 45 mph. Ghost sends a new route point every second.",
+          "body": "Click Start route · 45 mph. Ghost sends a new route point every second.",
           "kind": "permission",
           "point": {
             "inApp": "org.ghostlocation.desktop",
-            "descriptor": "Start route \u00b7 45 mph"
+            "descriptor": "Start route · 45 mph"
           },
           "title": "Start moving at 45 mph",
           "watch": {
@@ -272,14 +272,14 @@
         },
         {
           "id": "verify-route-on-phone",
-          "body": "Watch the phone\u2019s map. Ghost\u2019s dot shows sent points; it cannot verify what a phone app reads.",
+          "body": "Watch the phone’s map. Ghost’s dot shows sent points; it cannot verify what a phone app reads.",
           "kind": "verify",
           "title": "Check movement on the phone",
-          "verifierLabel": "You have checked movement in the phone\u2019s map"
+          "verifierLabel": "You have checked movement in the phone’s map"
         },
         {
           "id": "pause-route",
-          "body": "Pause route holds the last point. Resume route \u00b7 45 mph continues along the road.",
+          "body": "Pause route holds the last point. Resume route · 45 mph continues along the road.",
           "kind": "permission",
           "point": {
             "inApp": "org.ghostlocation.desktop",
@@ -290,7 +290,7 @@
         },
         {
           "id": "restore-location",
-          "body": "Click Restore real location, then check the phone\u2019s map before unplugging.",
+          "body": "Click Restore real location, then check the phone’s map before unplugging.",
           "kind": "verify",
           "point": {
             "inApp": "org.ghostlocation.desktop",
@@ -301,7 +301,7 @@
         },
         {
           "id": "recovery-help",
-          "body": "Sleep or connection loss pauses routes. Reconnect the same phone, then Resume; use Restore when done.",
+          "body": "Connection loss pauses routes. Reconnect the same phone and Resume; use Restore when done.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#if-something-goes-wrong",
           "kind": "open",
           "title": "Know how to recover",
@@ -320,7 +320,7 @@
       "steps": [
         {
           "id": "choose-installer",
-          "body": "Settings \u2192 System \u2192 About: this installer needs an x64 Intel/AMD PC.",
+          "body": "Settings → System → About: this installer needs an x64 Intel/AMD PC.",
           "kind": "check",
           "title": "Check your computer",
           "verifierLabel": "You know which installer matches your computer"
@@ -350,7 +350,7 @@
         },
         {
           "id": "unsigned-launch",
-          "body": "If SmartScreen blocks it, inspect the warning; More info \u2192 Run anyway requires your trust.",
+          "body": "If SmartScreen blocks it, inspect the warning; More info → Run anyway requires your trust.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#download-and-open",
           "kind": "open",
           "title": "Open this unsigned release",
@@ -366,14 +366,14 @@
         },
         {
           "id": "choose-configuration",
-          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost\u2019s first-run survey.",
+          "body": "Choose your Mac/Windows and iPhone/Android combination in Ghost’s first-run survey.",
           "kind": "permission",
           "title": "Choose your computer and phone",
           "verifierLabel": "The checklist matches your computer and phone"
         },
         {
           "id": "windows-usb-driver",
-          "body": "iPhone: install Apple Devices. Android: use your maker\u2019s ADB driver if detection fails.",
+          "body": "iPhone: install Apple Devices. Android: use your maker’s ADB driver if detection fails.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#choose-your-configuration",
           "kind": "open",
           "title": "Check Windows USB support",
@@ -382,10 +382,10 @@
         },
         {
           "id": "phone-settings",
-          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options; choose USB or Wireless debugging.",
+          "body": "iPhone: enable Developer Mode and restart. Android: enable Developer options and debugging.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#windows--iphone",
           "kind": "open",
-          "title": "Prepare your phone\u2019s settings",
+          "title": "Prepare your phone’s settings",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -418,14 +418,14 @@
           "id": "choose-connection",
           "kind": "permission",
           "title": "Choose USB or Wi-Fi",
-          "body": "Below Phone, open Connection \u2192 Change. Keep USB, or follow the Wi-Fi steps for your phone.",
+          "body": "Below Phone, open Connection → Change. Keep USB, or follow the Wi-Fi steps for your phone.",
           "verifierLabel": "Your connection method is selected"
         },
         {
           "id": "iphone-wifi",
           "kind": "permission",
           "title": "iPhone Wi-Fi: trust once over USB",
-          "body": "Select the USB iPhone. Click Enable Wi-Fi for selected iPhone. Choose Wi-Fi; wait for it before unplugging.",
+          "body": "Select the USB iPhone; enable Wi-Fi in Ghost. Choose Wi-Fi and wait for it before unplugging.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -436,7 +436,7 @@
           "id": "android-wifi-pair",
           "kind": "permission",
           "title": "Android Wi-Fi: pair with a code",
-          "body": "Android 11+: open Wireless debugging \u2192 Pair device with pairing code. Enter that address, port and code in Ghost.",
+          "body": "Android 11+: Wireless debugging → Pair device with pairing code. Enter details and click Pair phone.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -447,7 +447,7 @@
           "id": "android-wifi-connect",
           "kind": "permission",
           "title": "Android Wi-Fi: connect the paired phone",
-          "body": "Use the IP address and port from the main Wireless debugging screen. Its port differs from the pairing port.",
+          "body": "Use the main Wireless debugging IP/port, then Connect paired phone. The pairing port differs.",
           "watch": {
             "expect": [],
             "sensitive": true
@@ -477,7 +477,7 @@
           "id": "android-mock-provider",
           "body": "Android only: allow Appium Settings location access and select it as the mock location app.",
           "kind": "permission",
-          "title": "Check Android\u2019s location helper",
+          "title": "Check Android’s location helper",
           "verifierLabel": "Android is ready, or you are using iPhone"
         },
         {
@@ -504,12 +504,12 @@
           "id": "verify-phone-location",
           "body": "On the phone, allow map location access and tap current location. Confirm the selected area.",
           "kind": "verify",
-          "title": "Check the phone\u2019s map",
-          "verifierLabel": "The phone\u2019s map shows your chosen location"
+          "title": "Check the phone’s map",
+          "verifierLabel": "The phone’s map shows your chosen location"
         },
         {
           "id": "restore-before-route",
-          "body": "Click Restore real location. Wait for the phone\u2019s map to refresh.",
+          "body": "Click Restore real location. Wait for the phone’s map to refresh.",
           "kind": "permission",
           "point": {
             "descriptor": "Restore real location"
@@ -539,24 +539,24 @@
         },
         {
           "id": "start-route",
-          "body": "Click Start route \u00b7 45 mph. Ghost sends a new route point every second.",
+          "body": "Click Start route · 45 mph. Ghost sends a new route point every second.",
           "kind": "permission",
           "point": {
-            "descriptor": "Start route \u00b7 45 mph"
+            "descriptor": "Start route · 45 mph"
           },
           "title": "Start moving at 45 mph",
           "verifierLabel": "Ghost shows Pause route and a moving blue dot"
         },
         {
           "id": "verify-route-on-phone",
-          "body": "Watch the phone\u2019s map. Ghost\u2019s dot shows sent points; it cannot verify what a phone app reads.",
+          "body": "Watch the phone’s map. Ghost’s dot shows sent points; it cannot verify what a phone app reads.",
           "kind": "verify",
           "title": "Check movement on the phone",
-          "verifierLabel": "You have checked movement in the phone\u2019s map"
+          "verifierLabel": "You have checked movement in the phone’s map"
         },
         {
           "id": "pause-route",
-          "body": "Pause route holds the last point. Resume route \u00b7 45 mph continues along the road.",
+          "body": "Pause route holds the last point. Resume route · 45 mph continues along the road.",
           "kind": "permission",
           "point": {
             "descriptor": "Pause route"
@@ -566,7 +566,7 @@
         },
         {
           "id": "restore-location",
-          "body": "Click Restore real location, then check the phone\u2019s map before unplugging.",
+          "body": "Click Restore real location, then check the phone’s map before unplugging.",
           "kind": "verify",
           "point": {
             "descriptor": "Restore real location"
@@ -576,7 +576,7 @@
         },
         {
           "id": "recovery-help",
-          "body": "Sleep or connection loss pauses routes. Reconnect the same phone, then Resume; use Restore when done.",
+          "body": "Connection loss pauses routes. Reconnect the same phone and Resume; use Restore when done.",
           "href": "https://github.com/Blueturboguy07/ghost-location/blob/main/SETUP.md#if-something-goes-wrong",
           "kind": "open",
           "title": "Know how to recover",
@@ -594,7 +594,7 @@
   "reviewNote": "Ghost 0.1.6: native installer and automated USB/Wi-Fi checks; physical Wi-Fi testing pending on both hosts. Mac/iPhone USB use reported; other physical combinations remain unverified. Phone settings and phone-map readings require manual confirmation; UI watches do not verify phone GPS.",
   "sourceRepo": "ghost-location",
   "sourceOwner": "Blueturboguy07",
-  "sourceCommit": "cb0ccc0ecb4c6168dfa996458b0a3b62e2081d4f",
+  "sourceCommit": "211ad6764081eeb2c1d18bbd9e8d996afa90f6fc",
   "estimatedMinutes": 15,
   "readmeSectionIds": [
     "download-and-install",
