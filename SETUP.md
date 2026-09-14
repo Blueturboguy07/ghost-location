@@ -4,13 +4,13 @@ Ghost runs on your computer and sends simulated locations to a phone over a USB 
 
 ## Download and open
 
-Download **Ghost 0.1.6** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6) or use the [Publik installation guide](https://publikhq.com/ghost/install).
+Download **Ghost 0.1.7** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.7) or use the [Publik installation guide](https://publikhq.com/ghost/install).
 
 | Your computer | Download |
 | --- | --- |
-| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.6-mac-arm64.dmg` |
-| Mac with an Intel processor | `Ghost-0.1.6-mac-x64.dmg` |
-| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.6-win-x64.exe` |
+| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.7-mac-arm64.dmg` |
+| Mac with an Intel processor | `Ghost-0.1.7-mac-x64.dmg` |
+| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.7-win-x64.exe` |
 
 On Mac, **Apple menu → About This Mac** identifies the chip. On Windows, look at **Settings → System → About → System type**. Windows ARM and Linux are not release targets. Native builds are checked on macOS 15 and Windows Server 2025; other OS versions have not been rehearsed.
 
@@ -94,7 +94,7 @@ The speed is constant, regardless of road limits or traffic. The blue dot repres
 | Setup needed | Click Prepare while online. Complete Developer Mode or the mock-location selection on the phone. |
 | Location jumps back / acknowledgements stop | Keep the computer awake. Check USB, reconnect the same phone, and use Retry or Resume. Confirm the result in the phone's map. |
 | New phone blocked by an active session | Restore the previous session first. Old unresolved records are cleared when another usable phone appears; clearing a record does not restore the absent phone. |
-| No Route tab | Open the installed Ghost 0.1.6 desktop app. A stale running copy must be quit and reopened; normal quit attempts to restore its active phone first. A browser preview cannot control USB phones. |
+| No Route tab | Open the installed Ghost 0.1.7 desktop app. A stale running copy must be quit and reopened; normal quit attempts to restore its active phone first. A browser preview cannot control USB phones. |
 | Search or route planning fails | Check internet access. Try coordinates or a map pin. Public Photon, OSRM, and map services can be unavailable. Route planning needs reachable driving roads. |
 | Restore failed after unplugging | Reconnect the same phone and click Restore. Do not assume unplugging restored it. If iPhone simulation remains stuck, restart the iPhone. |
 | Android keeps the simulated point | Reconnect and Restore. If needed, stop Appium Settings on the phone and set Select mock location app to None, then refresh the phone's map. |
@@ -107,20 +107,26 @@ Mac → iPhone has been used successfully on a physical phone. Windows → iPhon
 
 For help, [open an issue](https://github.com/Blueturboguy07/ghost-location/issues) with the Ghost version, computer OS/processor, phone OS, and exact error. Remove phone identifiers and private locations from logs and screenshots.
 
-## Connect over the same Wi-Fi network (0.1.6)
+## Connect over the same Wi-Fi network (0.1.7)
 
-Open **Connection: USB · Change** below the Phone card. Choose **Wi-Fi** in this panel after the pairing steps below. Both fixed locations and routes use the existing location update loop. Restore real location before switching between USB and Wi-Fi.
+After a phone is working over USB, Ghost offers **Switch to Wi-Fi** if your computer has an active Wi-Fi connection. Choose **Stay on USB** to dismiss the offer for that phone. You can always open **Connection: USB · Change** below the Phone card and click **Switch to Wi-Fi**.
+
+Keep both devices on the same network and leave USB connected until Ghost confirms the switch. Ghost checks the same phone over Wi-Fi, carries over the current location, and resumes a running route from its held point. A brief interruption can occur while reopening the iPhone transport. If the Wi-Fi session fails, Ghost tries USB recovery; if both connections fail it keeps the session unresolved so you can Retry or Restore. Returning from Wi-Fi to USB still requires Restore first.
 
 ### iPhone on Mac or Windows
 
 1. Connect by USB once. Unlock and trust the computer; enable Developer Mode. Windows needs Apple's device-support installation as described above.
-2. Select the iPhone in Ghost. Open the connection panel and click **Enable Wi-Fi for selected iPhone**. Ghost saves the existing pairing record locally and enables Apple's wireless connection setting.
-3. Put the computer and phone on the same Wi-Fi network. Choose **Wi-Fi**, wait for your iPhone to appear, then unplug the cable.
+2. Prepare and select the iPhone in Ghost. Click **Switch to Wi-Fi** in the offer or connection panel. Ghost saves the existing pairing record locally and enables Apple's wireless connection setting.
+3. Wait for **Connected over Wi-Fi. You can unplug the USB cable.** before unplugging.
 4. Close the panel. Choose **Prepare** if needed, then set a location or start a route normally. Keep Ghost open and the computer awake.
 
 If the iPhone does not appear, reconnect USB and enable **Show this iPhone when on Wi-Fi** in Finder (Mac) or **Show this device when on Wi-Fi** in Apple Devices (Windows), then Apply. Unlock the iPhone and refresh Ghost. First-time trust still requires a cable; this is not wireless pairing with an untrusted iPhone. iOS 17.4+ is required. [Upstream iPhone network transport guide](https://github.com/doronz88/pymobiledevice3/blob/master/docs/guides/ios17-tunnels.md).
 
 ### Android on Mac or Windows
+
+**Already connected over USB (Android 8+):** Prepare the phone normally, put it on the same Wi-Fi network, then click **Switch to Wi-Fi**. Ghost reads the phone's Wi-Fi address, enables ADB TCP/IP on port 5555, and verifies the hardware identity before transferring the session. Use a trusted network. Restart the phone to disable this network-debugging mode. [Android's USB-assisted Wi-Fi flow](https://developer.android.com/tools/adb#wireless).
+
+**Without a cable (Android 11+):** Open **Manual setup and troubleshooting** in the connection panel.
 
 1. Android 11+ is required for the cable-free pairing flow. Enable Developer options by tapping Build number seven times. Enable **Wireless debugging** while on the same Wi-Fi as your computer.
 2. In Ghost's connection panel choose **Wi-Fi**, then **Android**.
@@ -128,7 +134,7 @@ If the iPhone does not appear, reconnect USB and enable **Show this iPhone when 
 4. Return to the phone's main **Wireless debugging** screen. Enter that screen's IP address and **connection port** in Ghost, then click **Connect paired phone**. The connection port differs from the pairing port.
 5. Close the panel, select your phone and click **Prepare** if needed. Keep Location on; select Appium Settings as the mock location app. Set a pin or start a route as usual.
 
-If the connection drops, check Wireless debugging and reconnect with its current IP address and port. ADB may also reconnect through its local discovery. Ghost checks the phone's hardware serial so a changed port stays the same phone. Android 8–10 uses the existing USB flow. [Android wireless debugging guide](https://developer.android.com/tools/adb#wireless-android11-command-line).
+If the connection drops, check Wireless debugging and reconnect with its current IP address and port. ADB may also reconnect through its local discovery. Ghost checks the phone's hardware serial so a changed port stays the same phone. For a USB-assisted connection, reconnect USB and use Switch to Wi-Fi again if the address changes. [Android wireless debugging guide](https://developer.android.com/tools/adb#wireless-android11-command-line).
 
 ### Wi-Fi troubleshooting and verification
 

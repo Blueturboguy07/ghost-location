@@ -164,9 +164,25 @@ try {
   console.log('PASS: route stop selection, planning without device mutation, start/pause/resume, moving dot, and compact controls.');
   // Pairing drafts must survive state pushes, and secrets disappear on submit.
   await page.locator('#connection-options').click();
-  assert.equal(await page.locator('[data-connection="wifi"]').isDisabled(), true, 'An active route must prevent transport switches.');
+  assert.equal(await page.locator('[data-connection="wifi"]').isEnabled(), true, 'A working USB route can switch to Wi-Fi.');
+  await page.getByRole('button', {name: 'Close connection settings'}).click();
+  assert.equal(await page.locator('#wifi-prompt').isVisible(), false);
+  await page.evaluate(() => window.ghostFixture.setState({network: {wifi: true}}));
+  assert.equal(await page.locator('#wifi-prompt').isVisible(), true);
+  await page.locator('#wifi-prompt-dismiss').click();
+  await page.evaluate(() => window.ghostFixture.setState({network: {wifi: true}}));
+  assert.equal(await page.locator('#wifi-prompt').isVisible(), false, 'Dismissed prompts stay dismissed across heartbeats.');
+  await page.locator('#connection-options').click();
+  await page.locator('#switch-to-wifi').click();
+  await page.waitForFunction(() => !document.querySelector('#wifi-dialog').open);
+  const handedOff = await page.evaluate(() => window.ghost.getState());
+  assert.equal(handedOff.session.connection, 'wifi'); assert.equal(handedOff.route.status, 'running');
+  assert.deepEqual((await page.evaluate(() => window.ghostFixture.getCalls())).filter(c => c.method === 'switchToWifi'), [{method: 'switchToWifi', deviceId: phone.id}]);
+  await page.locator('#connection-options').click();
+  await page.evaluate(async () => { const s = await window.ghost.getState(); await window.ghostFixture.setState({preferences: {...s.preferences, connection: 'usb'}}); });
   await page.evaluate(() => window.ghostFixture.setState({session: null, route: null, devices: []}));
   await page.locator('[data-connection="wifi"]').click();
+  await page.locator('#wifi-manual').evaluate(el => { el.open = true; });
   await page.locator('#wifi-phone').selectOption('android');
   await page.locator('#wifi-pair-address').fill('192.168.1.20:37123');
   await page.locator('#wifi-pair-code').fill('123456');
@@ -190,7 +206,7 @@ try {
   await page.screenshot({path: path.join(artifacts, 'ghost-wifi-iphone.png')});
   await page.getByRole('button', {name: 'Close connection settings', exact: true}).click();
   assert.match(await page.locator('#connection-options').textContent(), /Wi-Fi/);
-  console.log('PASS: Wi-Fi dialog, active-session transport guard, separate Android pairing/connect ports, persistent drafts and pairing-code cleanup.');
+  console.log('PASS: Wi-Fi prompt, dismissal, active-route handoff, separate Android pairing/connect ports, persistent drafts and pairing-code cleanup.');
   assert.deepEqual(rendererErrors, [], 'The renderer raised an error.');
   const blockedRequests = await application.evaluate(() => globalThis.ghostRendererFixture.blockedRequests);
   assert.ok(blockedRequests > 0, 'The fixture did not demonstrate that external map requests were blocked.');

@@ -7,11 +7,11 @@ const REPLACEABLE_SESSION_STATUSES = new Set(['unknown', 'waiting', 'error']);
 const USABLE_REPLACEMENT_STATES = new Set(['ready', 'setup-required']);
 
 export class Controller extends EventEmitter {
-  constructor({ adapters, store, now = Date.now, router = new Router(), clock = () => performance.now() }) {
+  constructor({ adapters, store, now = Date.now, router = new Router(), clock = () => performance.now(), network = async () => ({wifi: false}) }) {
     super(); this.adapters = adapters; this.store = store;
     this.state = { devices: [], runtime: {}, session: null, savedPlaces: [], recentPlaces: [], preferences: {}, busy: false, warning: null };
     this.scanning = null;
-    this.now = now;
+    this.now = now; this.network = network; this.networkCheckedAt = -Infinity;
     this.resumeSessionId = null;
     this.retryAt = 0;
     this.retryAttempts = 0;
@@ -61,6 +61,10 @@ export class Controller extends EventEmitter {
   }
   async scan() {
     const previousDevices = this.state.devices;
+    if (this.now() - this.networkCheckedAt >= 15000) {
+      this.networkCheckedAt = this.now();
+      this.state.network = await this.network().catch(() => ({wifi: false}));
+    }
     const results = await Promise.all(Object.entries(this.adapters).map(async ([platform, adapter]) => {
       try {
         const status = await adapter.status();
@@ -160,6 +164,8 @@ export class Controller extends EventEmitter {
   }
   async setConnection(connection) {
     if (!['usb', 'wifi'].includes(connection)) throw new Error('Choose USB or Wi-Fi.');
+    if (connection === (this.state.preferences.connection || 'usb')) return this.snapshot();
+    if (connection === 'wifi' && this.state.session?.status === 'active' && (this.state.session.connection || 'usb') === 'usb') return this.switchToWifi(this.state.session.deviceId);
     return this.exclusive(async () => {
       if (this.state.session) throw new Error('Restore the current location before changing connections.');
       const previous = this.state.preferences.connection;
@@ -168,6 +174,78 @@ export class Controller extends EventEmitter {
       for (const adapter of Object.values(this.adapters)) adapter.connection = connection;
       this.state.devices = [];
       await this.scan();
+    });
+  }
+  async switchToWifi(id) {
+    return this.exclusive(async () => {
+      const usb = this.device(id), current = this.state.session, adapter = this.adapters[usb.platform];
+      if (usb.connection !== 'usb' || usb.state !== 'ready') throw new Error('Connect and prepare your phone over USB first.');
+      if (current && (current.deviceId !== id || current.status !== 'active')) throw new Error('Retry or restore this phone’s session before switching.');
+      const wasRunning = this.state.route?.status === 'running';
+      this.pauseRouteMotion('Checking Wi-Fi. Holding the current route location.');
+      const resumeMotion = () => {
+        if (wasRunning && this.state.route?.status === 'paused' && this.state.session?.status === 'active' && !this.closing && !this.suspended) {
+          this.state.route.status = 'running';
+          this.state.route.message = 'Following the road at 45 mph. Sending a location every second.';
+          this.routeStepAt = this.clock(); this.scheduleRouteTick();
+        }
+      };
+      let touched = false, transport = usb;
+      const chooseTransport = device => {
+        for (const item of Object.values(this.adapters)) item.connection = device.connection;
+        this.state.preferences.connection = device.connection;
+        this.state.devices = [device];
+        if (current) {
+          Object.assign(current, {id: randomUUID(), serial: device.serial, connection: device.connection,
+            ...(device.hardwareId ? {hardwareId: device.hardwareId} : {}),
+            status: 'reconnecting', lastRefreshAt: null, refreshCount: 0, message: `Connecting over ${device.connection === 'wifi' ? 'Wi-Fi' : 'USB'}…`});
+          this.resumeSessionId = current.id;
+        }
+      };
+      try {
+        this.notify();
+        // Keep the USB location stream until the same trusted phone answers over Wi-Fi.
+        const wireless = await adapter.prepareWifi(usb);
+        if (wireless?.id !== usb.id || wireless.platform !== usb.platform || wireless.connection !== 'wifi' || wireless.state !== 'ready') throw new Error('The same phone is not ready on Wi-Fi. Keep the USB cable connected.');
+        if (this.closing || this.suspended || (current && (this.state.session !== current || current.status !== 'active'))) throw new Error('The phone connection changed while checking Wi-Fi.');
+        if (current) {
+          current.status = 'reconnecting'; current.message = 'Switching this location to Wi-Fi…';
+          try { await this.persist(); } catch (error) { current.status = 'active'; throw error; }
+          touched = true; this.notify();
+          await adapter.reset(usb); // Close the transport without sending a real-location restore.
+        }
+        chooseTransport(wireless); transport = wireless;
+        await this.persist(); this.notify();
+        if (current) {
+          const result = await adapter.set(wireless, {latitude: current.latitude, longitude: current.longitude, sessionId: current.id, reconnecting: true});
+          if (this.closing || this.suspended || current.status !== 'reconnecting') throw new Error('The Wi-Fi connection was interrupted.');
+          this.confirmActive(current, result);
+          current.message = 'Connected over Wi-Fi. You can unplug the USB cable.';
+          await this.persist();
+        }
+        resumeMotion();
+      } catch (error) {
+        if (touched && current && !this.closing && !this.suspended) {
+          try {
+            await adapter.reset(transport);
+            chooseTransport(usb); transport = usb;
+            await this.persist();
+            const result = await adapter.set(usb, {latitude: current.latitude, longitude: current.longitude, sessionId: current.id, reconnecting: true});
+            if (this.closing || this.suspended || current.status !== 'reconnecting') throw new Error('USB recovery was interrupted.');
+            this.confirmActive(current, result); await this.persist(); resumeMotion();
+          } catch (recoveryError) {
+            current.status = 'unknown'; current.autoReconnect = false; this.resumeSessionId = null;
+            current.message = `Connection needs attention: ${recoveryError.message}. Reconnect this phone and Retry or Restore.`;
+            await this.persist();
+          }
+        } else {
+          if (!current && this.state.preferences.connection === 'wifi') {
+            chooseTransport(usb); await this.persist();
+          }
+          resumeMotion();
+        }
+        throw new Error(`${error.message}${current?.status === 'active' ? ' Your location is still running over USB.' : ''}`);
+      }
     });
   }
   async connectWifi(input) {

@@ -387,3 +387,19 @@ test('Wi-Fi mode is explicit in discovery, set and restore requests', async () =
   h.reply(h.requests[2], {cleared: true}); await clearing;
   h.child.kill();
 });
+
+test('Wi-Fi handoff preflight bypasses the USB cache and requires the same ready phone', async () => {
+  for (const matching of [true, false]) {
+    const h = harness(); h.adapter.connection = 'usb';
+    const preflight = h.adapter.prepareWifi({...device, state: 'ready'});
+    const outcome = matching ? preflight : assert.rejects(preflight, /Wi-Fi/);
+    await new Promise(setImmediate);
+    assert.equal(h.requests[0].method, 'enable-wifi'); assert.equal(h.requests[0].params.connection || 'usb', 'usb');
+    h.reply(h.requests[0], {enabled: true}); await new Promise(setImmediate);
+    assert.equal(h.requests[1].method, 'discover'); assert.equal(h.requests[1].params.connection, 'wifi');
+    const wireless = {...device, id: matching ? device.id : 'ios:other', connection: 'wifi', state: 'ready'};
+    h.reply(h.requests[1], [wireless]);
+    if (matching) assert.deepEqual(await outcome, wireless); else await outcome;
+    assert.equal(h.adapter.connection, 'usb'); h.child.kill();
+  }
+});

@@ -14,7 +14,7 @@
         "label": "Windows"
       }
     ],
-    "requirements": "Mac (Apple chip or Intel) or Windows x64. USB: iOS 17.4+ or Android 8+. Wi-Fi: trusted iOS 17.4+ (initial USB setup), or Android 11+. Unsigned release; physical Wi-Fi testing pending.",
+    "requirements": "Mac (Apple chip or Intel) or Windows x64. iOS 17.4+ or Android 8+ with initial USB setup; Android 11+ also pairs wirelessly. Unsigned release; physical Wi-Fi handoff testing pending.",
     "hero_image_url": "https://raw.githubusercontent.com/Blueturboguy07/ghost-location/main/docs/images/ghost-route.png",
     "mac_signature": "unsigned",
     "alternative_to": {
@@ -36,11 +36,11 @@
     "routes": {
       "macos": {
         "kind": "signed_download",
-        "assetName": "Ghost-0.1.6-mac-arm64.dmg"
+        "assetName": "Ghost-0.1.7-mac-arm64.dmg"
       },
       "windows": {
         "kind": "signed_download",
-        "assetName": "Ghost-0.1.6-win-x64.exe"
+        "assetName": "Ghost-0.1.7-win-x64.exe"
       }
     },
     "packageManager": "npm",
@@ -51,7 +51,7 @@
     "permissions": []
   },
   "sourceCommit": "211ad6764081eeb2c1d18bbd9e8d996afa90f6fc",
-  "tag": "v0.1.6",
-  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6",
+  "tag": "v0.1.7",
+  "releaseUrl": "https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.7",
   "alternativePriceVerifiedAt": "2026-09-13"
 }

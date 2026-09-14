@@ -28,6 +28,7 @@ export function createPreviewBridge() {
   return {
     getState: async () => structuredClone(state),
     scanDevices: async () => structuredClone(state),
+    switchToWifi: desktopOnly,
     setConnection: desktopOnly,
     connectWifi: desktopOnly,
     prepareDevice: desktopOnly,

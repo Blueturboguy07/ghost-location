@@ -145,8 +145,8 @@ class Bridge:
         return result
 
     async def enable_wifi(self, udid):
-        if self.session:
-            raise RuntimeError("Restore the current location before configuring Wi-Fi.")
+        if self.session and (self.session["udid"] != udid or self.session.get("connection", "usb") != "usb"):
+            raise RuntimeError("Select the iPhone that owns the USB session.")
         async with await usb_lockdown(udid, autopair=True) as lockdown:
             if not lockdown.paired:
                 raise RuntimeError("Unlock the iPhone and trust this computer first.")

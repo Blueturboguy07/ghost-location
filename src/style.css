@@ -432,3 +432,9 @@ dialog[open] { animation: rise .18s ease-out; }
 .wifi-form .secondary-button { justify-self: start; margin-top: 4px; }
 #wifi-dialog .settings-note { font-size: 14px; line-height: 1.5; }
 #wifi-dialog { background: rgba(248,249,251,.98); }
+
+.wifi-prompt { margin-top: 16px; padding: 16px; border: 1px solid var(--line, #ddd); border-radius: 16px; background: rgba(255,255,255,.65); }
+.wifi-prompt p { margin: 8px 0 12px; font-size: 14px; line-height: 1.5; color: var(--muted, #666); }
+.wifi-prompt > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+#wifi-manual { margin: 24px 0; }
+#wifi-manual summary { cursor: pointer; font-weight: 500; margin-bottom: 20px; }

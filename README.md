@@ -5,7 +5,7 @@ place, drop a pin, or enter coordinates, then explicitly apply it to your select
 phone. Windows and macOS share one interface and use the appropriate iPhone or
 Android adapter.
 
-Current version: **0.1.6**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
+Current version: **0.1.7**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
 interface, Android cleanup, Windows packaging, recovery-record, and reconnection changes.
 
 ![Ghost following an example road route in Chicago](docs/images/ghost-route.png)
@@ -14,7 +14,7 @@ interface, Android cleanup, Windows packaging, recovery-record, and reconnection
 
 ## Download and install
 
-Get [Ghost 0.1.6 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6).
+Get [Ghost 0.1.7 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.7).
 Follow the [setup guide](SETUP.md) for Mac → iPhone, Windows → iPhone, Mac → Android, or Windows → Android, or use [Publik's guided install](https://publikhq.com/ghost/install).
 
 The downloads include the phone runtimes. No programming tools or Ghost account are needed. These early releases are unsigned; the guide explains opening them and the limits of current device testing.
@@ -26,7 +26,7 @@ The downloads include the phone runtimes. No programming tools or Ghost account 
 - Interactive map, manual place search, draggable pin, and latitude/longitude input.
 - First-run Mac/Windows and iPhone/Android survey with a checklist tailored to all four USB configurations.
 - Saved places and recent selections stored locally.
-- Explicit USB or same-network Wi-Fi connections with guided pairing. iPhone pairs once over USB; Android 11+ uses a wireless pairing code.
+- A one-click USB → Wi-Fi handoff keeps the current location and resumes routes. Ghost offers it after a working USB session when the computer has Wi-Fi. Android 11+ also supports cable-free pairing.
 - iPhone location simulation through a bundled pymobiledevice3 sidecar.
 - Android location simulation through bundled ADB and Appium Settings.
 - Ongoing fixed-location updates and same-phone reconnection while Ghost stays open.
@@ -195,8 +195,8 @@ device runtimes. Release installers are unsigned. Signing/notarization credentia
 for a trusted macOS launch and a recognized Windows publisher.
 No publishing or repository upload is performed by these commands.
 
-For v0.1.6, a macOS arm64 build produces `Ghost-0.1.6-mac-arm64.dmg` and
-`Ghost-0.1.6-mac-arm64.zip` in `release/`.
+For v0.1.7, a macOS arm64 build produces `Ghost-0.1.7-mac-arm64.dmg` and
+`Ghost-0.1.7-mac-arm64.zip` in `release/`.
 
 ### Native CI builds
 
@@ -260,4 +260,4 @@ before claiming all four connections are verified.
 
 GPL-3.0-or-later. See LICENSE and THIRD_PARTY_NOTICES.md.
 
-For wireless setup, see [the Wi-Fi guide](SETUP.md#connect-over-the-same-wi-fi-network-016). Wi-Fi support is implemented and covered by automated tests; physical phone validation is still needed.
+For wireless setup, see [the Wi-Fi guide](SETUP.md#connect-over-the-same-wi-fi-network-017). Wi-Fi support is implemented and covered by automated tests; physical phone validation is still needed.

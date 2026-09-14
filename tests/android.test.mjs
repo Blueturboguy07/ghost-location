@@ -394,3 +394,29 @@ test('Android keeps the same phone identity across Wi-Fi port changes and reject
   await adapter.clear(after);
   assert.equal(adapter.active.size, 0);
 });
+
+test('USB-assisted Android Wi-Fi verifies the hardware identity before handing over', async () => {
+  const {adapter, calls} = rig({override: args => {
+    if (args.includes('addr')) return {stdout: '3: wlan0    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n'};
+    if (args.includes('tcpip')) return {stdout: 'restarting in TCP mode port: 5555'};
+    if (args[0] === 'connect') return {stdout: 'connected to 192.168.1.20:5555'};
+  }});
+  const result = await adapter.prepareWifi({...phone, connection: 'usb', state: 'ready'});
+  assert.equal(result.id, phone.id); assert.equal(result.hardwareId, phone.serial); assert.equal(result.connection, 'wifi');
+  assert.equal(adapter.connection, 'usb');
+  assert.ok(calls.some(c => c.args.join(' ') === '-s USB123 tcpip 5555'));
+  assert.ok(!calls.some(c => c.args.includes('start-foreground-service') || c.args.includes('stopservice')));
+});
+test('USB-assisted Wi-Fi refuses cellular-only phones and mismatched wireless identities', async () => {
+  for (const hasWifi of [false, true]) {
+    const {adapter, calls} = rig({override: args => {
+      if (args.includes('addr')) return {stdout: `3: ${hasWifi ? 'wlan0' : 'rmnet0'}    inet 192.168.1.20/24 scope global\n`};
+      if (args.includes('tcpip')) return {stdout: 'restarting in TCP mode port: 5555'};
+      if (args[0] === 'connect') return {stdout: 'connected to 192.168.1.20:5555'};
+      if (args[1] === '192.168.1.20:5555' && args.includes('ro.serialno')) return {stdout: 'OTHER123'};
+    }});
+    await assert.rejects(adapter.prepareWifi({...phone, connection: 'usb'}), hasWifi ? /does not match/ : /same Wi-Fi/);
+    assert.equal(adapter.connection, 'usb');
+    if (!hasWifi) assert.ok(!calls.some(c => c.args.includes('tcpip')));
+  }
+});

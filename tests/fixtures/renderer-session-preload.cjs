@@ -47,6 +47,7 @@ const unexpected = method => async () => {
 contextBridge.exposeInMainWorld('ghost', {
   getState: async () => snapshot(),
   setConnection: async connection => { calls.push({method: 'setConnection', connection}); state.preferences.connection = connection; return publish(); },
+  switchToWifi: async deviceId => { calls.push({method: 'switchToWifi', deviceId}); state.preferences.connection = 'wifi'; state.devices = state.devices.map(d => ({...d, connection: 'wifi'})); if (state.session) state.session.connection = 'wifi'; return publish(); },
   connectWifi: async value => { calls.push({method: 'connectWifi', ...value}); return publish(); },
   getRoute: async () => plannedRoute || null,
   planRoute: async stops => {

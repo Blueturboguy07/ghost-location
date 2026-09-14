@@ -398,3 +398,67 @@ test('a disconnected Android Wi-Fi session can reconnect through ADB before Rest
   assert.deepEqual(calls, ['192.168.1.20:40001']);
   assert.equal(c.state.session.deviceId, phone.id);
 });
+
+const wifiPhone = {...phone, serial: '192.168.1.20:5555', hardwareId: phone.serial, connection: 'wifi'};
+test('active USB handoff keeps the same point, journals Wi-Fi, resumes route and ignores old acknowledgements', async t => {
+  const {c, adapter, store, calls} = await fixture();
+  t.after(() => c.pauseRouteMotion());
+  await c.applyLocation(point);
+  const oldId = c.state.session.id;
+  c.state.route = {status: 'running', traveledMeters: 320, point: {latitude: 0, longitude: 0}};
+  adapter.prepareWifi = async d => { assert.equal(d.id, phone.id); assert.equal(c.state.session.status, 'active'); assert.equal(c.state.route.status, 'paused'); return wifiPhone; };
+  adapter.set = async (d, target) => {
+    assert.equal(d.connection, 'wifi'); assert.equal(target.latitude, 0); assert.equal(target.longitude, 0);
+    assert.equal(store.data.session.connection, 'wifi'); assert.equal(store.data.session.serial, wifiPhone.serial);
+    return {ok: true};
+  };
+  calls.length = 0;
+  await c.setConnection('wifi');
+  assert.equal(c.state.session.status, 'active');
+  assert.notEqual(c.state.session.id, oldId);
+  assert.equal(c.state.session.hardwareId, phone.serial);
+  assert.equal(c.state.route.status, 'running'); assert.equal(c.state.route.traveledMeters, 320);
+  assert.equal(adapter.connection, 'wifi'); assert.ok(!calls.includes('clear'));
+  await c.sessionEnded({deviceId: phone.id, sessionId: oldId, error: 'Old USB closed'});
+  assert.equal(c.state.session.status, 'active');
+});
+test('Wi-Fi preflight failure or different phone leaves the active USB stream untouched', async () => {
+  for (const result of [null, {...wifiPhone, id: secondPhone.id}]) {
+    const {c, adapter, calls} = await fixture(); await c.applyLocation(point); calls.length = 0;
+    adapter.prepareWifi = async () => { if (!result) throw new Error('Not found'); return result; };
+    await assert.rejects(c.switchToWifi(phone.id), /USB/);
+    assert.equal(c.state.session.status, 'active'); assert.equal(c.state.preferences.connection, 'usb');
+    assert.deepEqual(calls, []);
+  }
+});
+test('failed Wi-Fi Set recovers USB at the same point without Restore', async () => {
+  const {c, adapter, calls, store} = await fixture(); await c.applyLocation(point);
+  adapter.prepareWifi = async () => wifiPhone;
+  const targets = [];
+  adapter.set = async (d, target) => { targets.push([d.connection, target.latitude, target.longitude]); if (d.connection === 'wifi') throw new Error('Tunnel failed'); return {ok: true}; };
+  await assert.rejects(c.switchToWifi(phone.id), /still running over USB/);
+  assert.deepEqual(targets, [['wifi', 0, 0], ['usb', 0, 0]]);
+  assert.equal(c.state.session.status, 'active'); assert.equal(store.data.session.connection, 'usb');
+  assert.ok(!calls.includes('clear'));
+});
+test('failed handoff and USB recovery keep an unresolved journal, never a false active state', async () => {
+  const {c, adapter, store} = await fixture(); await c.applyLocation(point);
+  adapter.prepareWifi = async () => wifiPhone;
+  adapter.set = async () => { throw new Error('Disconnected'); };
+  await assert.rejects(c.switchToWifi(phone.id));
+  assert.equal(c.state.session.status, 'unknown'); assert.equal(store.data.session.status, 'unknown');
+  assert.equal(c.resumeSessionId, null);
+});
+test('failure to journal before handoff does not reset USB', async () => {
+  const {c, adapter, calls, store} = await fixture(); await c.applyLocation(point); calls.length = 0;
+  adapter.prepareWifi = async () => wifiPhone;
+  store.save = async () => { throw new Error('Disk full'); };
+  await assert.rejects(c.switchToWifi(phone.id), /Disk full/);
+  assert.equal(c.state.session.status, 'active'); assert.deepEqual(calls, []);
+});
+test('idle USB handoff selects verified Wi-Fi without sending any location', async () => {
+  const {c, adapter, calls} = await fixture(); adapter.prepareWifi = async () => wifiPhone;
+  await c.switchToWifi(phone.id);
+  assert.equal(c.state.session, null); assert.equal(c.state.devices[0].serial, wifiPhone.serial);
+  assert.deepEqual(calls, ['persist']);
+});

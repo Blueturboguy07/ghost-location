@@ -180,6 +180,13 @@ export class IosAdapter {
     const devices = await this.request('discover', {connection: this.connection || 'usb'});
     return devices.filter((device) => device.platform === 'ios' && device.connection === (this.connection || 'usb'));
   }
+  async prepareWifi(device) {
+    await this.enableWifi(device);
+    const devices = await this.request('discover', {connection: 'wifi'}, 15000);
+    const wireless = devices.find(item => item.id === device.id && item.connection === 'wifi' && item.state === 'ready');
+    if (!wireless) throw new Error('Your iPhone is not reachable on Wi-Fi yet. Keep it unlocked on the same network, then try again.');
+    return wireless;
+  }
   async enableWifi(device) {
     if (device.connection !== 'usb') throw new Error('Connect this iPhone by USB to enable Wi-Fi.');
     return this.request('enable-wifi', this.deviceParams(device), 60_000);

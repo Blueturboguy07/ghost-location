@@ -334,6 +334,21 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
             lockdown.save_pair_record.assert_awaited_once()
             lockdown.set_enable_wifi_connections.assert_awaited_once_with(True)
 
+    async def test_enabling_wifi_preserves_same_phone_usb_stream(self):
+        bridge, session, _ = self.connected_bridge(refresh_interval=0.005)
+        lockdown = AsyncMock()
+        lockdown.paired = True
+        lockdown.__aenter__.return_value = lockdown
+        with patch.object(bridge_module, "emit"), patch.object(bridge_module, "usb_lockdown", AsyncMock(return_value=lockdown)):
+            await bridge.dispatch("set", {"udid": "phone", "latitude": 1, "longitude": 2})
+            await bridge.dispatch("enable-wifi", {"udid": "phone"})
+            await asyncio.sleep(0.03)
+            self.assertIs(bridge.session, session)
+            self.assertGreaterEqual(session["location"].set.await_count, 3)
+            session["location"].clear.assert_not_awaited()
+            with self.assertRaisesRegex(RuntimeError, "owns the USB session"):
+                await bridge.dispatch("enable-wifi", {"udid": "another-phone"})
+
     async def test_wifi_discovery_deduplicates_and_closes_connections(self):
         bridge = bridge_module.Bridge()
         lockdown = AsyncMock()

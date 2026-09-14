@@ -151,3 +151,10 @@ Publik’s existing guide/assembler/submission test selection passed 152 tests. 
 - The five CI-built installers were uploaded with `SHA256SUMS.txt`. Uploaded SHA-256 digests match the downloaded CI artifacts; both Mac DMGs and ZIPs pass integrity checks.
 - The actual CI-built Apple Silicon app passed isolated native UI, bundled-runtime, Wi-Fi discovery IPC, search and route planning checks without sending location commands to a phone.
 - [GitHub 0.1.6](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.6) is the latest release. Publik's approved release points to the same source and its v2 guide covers Wi-Fi on Mac and Windows. The GhostMe $12.95/month comparison is preserved.
+
+## 0.1.7 USB-to-Wi-Fi handoff (2026-09-14)
+
+- 133 Node tests pass, including the wrapper running 22 Python bridge tests. New coverage includes same-phone preflight, preserving the current point and route progress, stale USB events, failed Wi-Fi Set with USB recovery, failed recovery, journal failure, idle handoff, and Mac/Windows network detection.
+- Isolated Electron UI rehearsal passes: the Wi-Fi offer appears for an active USB session on host Wi-Fi, stays dismissed across heartbeats, and an active route can switch. Manual Android pairing drafts and code cleanup still pass.
+- The rebuilt macOS arm64 bundle in `release/local-017/mac-arm64/Ghost.app` passes native smoke checks with temporary settings, both bundled runtimes, read-only Wi-Fi discovery, live search/routing and no phone location commands. Actual host Wi-Fi detection also returns true.
+- Physical phone handoff remains unverified. The controller's recovery tests simulate transport failures; they do not establish continuity on a real phone during a transport change.

@@ -8,6 +8,7 @@ import { Geocoder } from '../backend/geocoder.mjs';
 import { IosAdapter } from '../backend/ios.mjs';
 import { AndroidAdapter } from '../backend/android.mjs';
 import { run } from '../backend/process.mjs';
+import { wifiStatus } from '../backend/network.mjs';
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devUrl = !app.isPackaged && process.env.GHOST_DEV_URL === 'http://127.0.0.1:5173' ? process.env.GHOST_DEV_URL : null;
@@ -45,7 +46,7 @@ async function boot() {
   const callbacks = { onSessionEnd: event => controller?.sessionEnded(event), onLocationRefresh: event => controller?.locationRefreshed(event) };
   const ios = new IosAdapter({ ...options, ...callbacks });
   const android = new AndroidAdapter({ ...options, ...callbacks });
-  controller = new Controller({ adapters: { ios, android }, store: new Store(path.join(app.getPath('userData'), 'settings.json')) });
+  controller = new Controller({ adapters: { ios, android }, network: wifiStatus, store: new Store(path.join(app.getPath('userData'), 'settings.json')) });
   controller.on('state', state => {
     const active = state.session && ['active', 'applying', 'reconnecting'].includes(state.session.status);
     if (active && wakeLock == null) wakeLock = powerSaveBlocker.start('prevent-app-suspension');
@@ -55,6 +56,7 @@ async function boot() {
 
   const handlers = {
     getState: () => controller.snapshot(),
+    switchToWifi: id => controller.switchToWifi(id),
     setConnection: value => controller.setConnection(value),
     connectWifi: value => controller.connectWifi(value),
     scanDevices: () => controller.scanDevices(),

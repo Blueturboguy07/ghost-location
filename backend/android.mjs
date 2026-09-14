@@ -193,6 +193,31 @@ export class AndroidAdapter {
     }));
   }
 
+  async prepareWifi(device) {
+    if (this.connection !== 'usb' || device.connection !== 'usb') throw new Error('Connect this Android phone by USB first.');
+    const serial = await this.assertConnected(device);
+    const {stdout} = await this.shell(serial, ['ip', '-o', '-4', 'addr', 'show']);
+    const address = stdout.match(/\b(?:wlan|wifi)\d+\s+inet\s+(\d{1,3}(?:\.\d{1,3}){3})\//)?.[1];
+    if (!address || isIP(address) !== 4 || /^(?:127\.|169\.254\.|0\.)/.test(address)) throw new Error('Connect your phone to the same Wi-Fi network as this computer first.');
+    const endpoint = wifiEndpoint(`${address}:5555`);
+    await this.command(['-s', serial, 'tcpip', '5555']);
+    // Android restarts adbd here; the location helper keeps running on the phone.
+    let connected = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt) await new Promise(resolve => setTimeout(resolve, 750));
+      const result = await this.command(['connect', endpoint], {timeoutMs: 5000, tolerateFailure: true});
+      if (result.code === 0 && /(?:already )?connected to/i.test(result.output) && !/failed|cannot|unable/i.test(result.output)) { connected = true; break; }
+    }
+    if (!connected) throw new Error('Could not reach your phone on Wi-Fi. Keep USB connected and check the network or firewall.');
+    const identity = (await this.shell(endpoint, ['getprop', 'ro.serialno'])).stdout.trim();
+    if (identity !== serial) throw new Error('The Wi-Fi phone does not match the selected USB phone. Staying on USB.');
+    const info = await this.info(endpoint);
+    const check = await this.readiness(endpoint, info.api);
+    if (!check.ready) throw new Error(check.detail);
+    this.knownWifi.set(endpoint, identity);
+    return {...device, serial: endpoint, hardwareId: identity, connection: 'wifi', state: 'ready', detail: 'Wi-Fi connected.'};
+  }
+
   async connectWifi({endpoint, code} = {}) {
     const address = wifiEndpoint(endpoint);
     if (code !== undefined && (typeof code !== 'string' || !/^\d{6}$/.test(code))) throw new Error('Enter the six-digit pairing code shown on the phone.');

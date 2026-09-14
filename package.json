@@ -1,6 +1,6 @@
 {
   "name": "ghost-location",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Choose a place. Set your phone's location over USB or Wi-Fi.",
   "author": "Ghost contributors",

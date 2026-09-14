@@ -14,6 +14,7 @@ const detectedHost = /Windows/i.test(navigator.userAgent) ? 'windows' : 'mac';
 document.documentElement.classList.toggle('host-windows', detectedHost === 'windows');
 document.documentElement.classList.toggle('desktop-app', !isPreview);
 const api = window.ghost || createPreviewBridge();
+const dismissedWifi = new Set();
 const icons = { MapPin, Bookmark, Settings2, HelpCircle, ArrowUpRight, ArrowRight, Search, Plus, Minus, Crosshair, Smartphone, RefreshCw, ChevronDown, X, Check, Circle, Download, Pencil, Trash2, RotateCcw, LoaderCircle, Cable, Laptop, Monitor, ChevronLeft };
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
@@ -129,7 +130,7 @@ $('#app').innerHTML = `
       <div class="panel-scroll">
         <div class="panel-heading"><span class="eyebrow" id="panel-eyebrow">Location</span><h1 id="panel-title">Set a location</h1><p id="panel-subtitle">Choose a phone and a point on the map.</p></div>
         <div class="location-modes" role="group" aria-label="Location mode"><button data-location-mode="fixed" aria-pressed="true">Fixed location</button><button data-location-mode="route" aria-pressed="false">Route</button></div>
-        <section class="device-section" aria-labelledby="device-label"><div class="section-heading"><h2 id="device-label">Phone</h2><button id="scan-button" class="icon-button" aria-label="Refresh connected devices" title="Refresh connected devices">${icon('refresh-cw')}</button></div><div id="device-area"></div><button id="connection-options" class="setup-link">Connection: USB · Change</button></section>
+        <section class="device-section" aria-labelledby="device-label"><div class="section-heading"><h2 id="device-label">Phone</h2><button id="scan-button" class="icon-button" aria-label="Refresh connected devices" title="Refresh connected devices">${icon('refresh-cw')}</button></div><div id="device-area"></div><div id="wifi-prompt" class="wifi-prompt" hidden><strong>Switch to Wi-Fi?</strong><p>Your phone is working over USB and this computer has Wi-Fi. Keep both on the same network and leave the cable connected until confirmed.</p><p id="wifi-prompt-android" hidden>Enables network debugging on Android. Use a trusted network; restart the phone to turn it off.</p><div><button id="wifi-prompt-switch" class="secondary-button compact">Switch to Wi-Fi</button><button id="wifi-prompt-dismiss" class="text-button">Stay on USB</button></div></div><button id="connection-options" class="setup-link">Connection: USB · Change</button></section>
         <section class="destination-section" aria-labelledby="destination-label">
           <div class="section-heading"><h2 id="destination-label">Destination</h2><button id="save-button" class="icon-button" aria-label="Save selected place" title="Save selected place" disabled>${icon('bookmark')}</button></div>
           <div id="destination-summary"></div>
@@ -160,13 +161,15 @@ $('#app').innerHTML = `
 
   <dialog id="wifi-dialog" class="sheet-dialog" aria-labelledby="wifi-title">
     <div class="sheet-heading"><div><span class="eyebrow">Phone connection</span><h2 id="wifi-title">Connect over Wi-Fi</h2></div><button class="icon-button" data-close="wifi-dialog" aria-label="Close connection settings">${icon('x')}</button></div>
-    <p class="sheet-intro">Keep your phone and computer on the same Wi-Fi network. Restore the current location before changing connections.</p>
+    <p class="sheet-intro">Keep your phone and computer on the same Wi-Fi network. Leave the cable connected until Ghost confirms the switch.</p>
     <div class="location-modes" role="group" aria-label="Connection method"><button data-connection="usb">USB cable</button><button data-connection="wifi">Wi-Fi</button></div>
     <p id="wifi-status" class="settings-note" role="status"></p>
+    <div id="wifi-handoff" class="settings-group" hidden><button id="switch-to-wifi" class="primary-button">Switch to Wi-Fi</button><p class="settings-note">Your current location carries over. A running route pauses during the switch and continues once connected.</p><p id="wifi-android-note" class="settings-note" hidden>This enables Android network debugging on port 5555. Use a trusted network; restart the phone to turn it off.</p></div>
+    <details id="wifi-manual"><summary>Manual setup and troubleshooting</summary>
     <label class="field-label" for="wifi-phone">Your phone</label><select id="wifi-phone" class="text-input"><option value="ios">iPhone · iOS 17.4+</option><option value="android">Android · Android 11+</option></select>
     <div id="wifi-ios" class="settings-group">
       <h3>Pair once by cable</h3>
-      <ol class="wifi-steps"><li>Choose USB cable above. Connect and unlock your iPhone, trust this computer and enable Developer Mode. On Windows, install Apple Devices first.</li><li>Select your iPhone in the main Phone menu, then return here and enable Wi-Fi.</li><li>Choose Wi-Fi above. Wait for the phone to appear, then unplug the cable. You can now set a location or start a route.</li></ol>
+      <ol class="wifi-steps"><li>Choose USB cable above. Connect and unlock your iPhone, trust this computer and enable Developer Mode. On Windows, install Apple Devices first.</li><li>Select your iPhone in the main Phone menu, then choose Switch to Wi-Fi above.</li><li>Choose Wi-Fi above. Wait for the phone to appear, then unplug the cable. You can now set a location or start a route.</li></ol>
       <button id="enable-iphone-wifi" class="secondary-button">Enable Wi-Fi for selected iPhone</button>
       <p class="settings-note">If discovery fails, enable “Show this iPhone when on Wi-Fi” in Finder on Mac, or “Show this device when on Wi-Fi” in Apple Devices on Windows, and apply. Unlock the phone and refresh.</p>
     </div>
@@ -183,8 +186,9 @@ $('#app').innerHTML = `
         <p class="settings-note">After pairing, go back to the main Wireless debugging screen and use its IP address and port here. This port is different from the pairing port and may change after reconnecting.</p>
         <button id="wifi-connect-button" type="submit" class="secondary-button">Connect paired phone</button>
       </form>
-      <p class="settings-note">Once connected, close this panel and choose Prepare if needed. Keep Location on and select Appium Settings as the mock location app. Android 8–10 uses USB.</p>
+      <p class="settings-note">Once connected, close this panel and choose Prepare if needed. Keep Location on and select Appium Settings as the mock location app. Android 8–10 can switch from an authorized USB connection.</p>
     </div>
+    </details>
     <p class="settings-note">Allow Ghost and its device tools through your computer’s local-network/firewall prompts. Guest Wi-Fi, client isolation and some VPNs can prevent devices from finding each other. Keep Ghost open; restore real location before disconnecting.</p>
     <div class="dialog-actions"><button id="wifi-refresh" class="primary-button">Refresh phones</button></div>
   </dialog>
@@ -194,7 +198,7 @@ $('#app').innerHTML = `
     <div class="settings-group"><h3>Device setup</h3><div class="configuration-row"><div><strong id="settings-configuration">No setup selected</strong><small>Ghost uses this to show the right connection steps.</small></div><button id="rerun-onboarding" class="secondary-button compact">Change</button></div></div>
     <div class="settings-group"><h3>Location sessions</h3><label class="setting-row"><span><strong>Restore on quit</strong><small>Ghost tries to stop location simulation before it closes. Keep the phone connected.</small></span><input id="restore-preference" type="checkbox" class="switch" /></label></div>
     <div class="settings-group"><h3>Device tools</h3><div id="runtime-status"></div><button id="install-runtime" class="secondary-button">${icon('download')} Prepare device tools</button><p class="settings-note">First-time preparation may need an internet connection.</p></div>
-    <form id="provider-form" class="settings-group"><h3>Place search</h3><label class="field-label" for="provider-url">Photon-compatible endpoint</label><input id="provider-url" class="text-input" type="url" required placeholder="https://photon.komoot.io/api/" /><p class="settings-note">Search runs only when you submit. Map tiles come from OpenStreetMap.</p><div class="button-row"><button type="submit" class="secondary-button compact">Save endpoint</button><button id="reset-provider" type="button" class="text-button">Reset</button></div></form><div class="settings-footer">Ghost 0.1.6 · Free and open source</div>
+    <form id="provider-form" class="settings-group"><h3>Place search</h3><label class="field-label" for="provider-url">Photon-compatible endpoint</label><input id="provider-url" class="text-input" type="url" required placeholder="https://photon.komoot.io/api/" /><p class="settings-note">Search runs only when you submit. Map tiles come from OpenStreetMap.</p><div class="button-row"><button type="submit" class="secondary-button compact">Save endpoint</button><button id="reset-provider" type="button" class="text-button">Reset</button></div></form><div class="settings-footer">Ghost 0.1.7 · Free and open source</div>
   </dialog>
 
   <dialog id="save-dialog" class="small-dialog" aria-labelledby="save-title"><div class="sheet-heading"><div><span class="eyebrow">Saved place</span><h2 id="save-title">Save this place</h2></div><button class="icon-button" data-close="save-dialog" aria-label="Close save place">${icon('x')}</button></div><form id="save-form"><label class="field-label" for="place-name">Name</label><input id="place-name" class="text-input" maxlength="120" required placeholder="Place name" /><input id="place-id" type="hidden" /><p id="save-coordinates" class="settings-note"></p><button class="primary-button" type="submit"><span>Save place</span>${icon('bookmark')}</button></form></dialog>
@@ -478,21 +482,36 @@ function renderView() {
   $('#panel-subtitle').textContent = showingSaved ? 'Select a place to return to the map.' : locationMode === 'route' ? 'Choose stops. Move along the road at 45 mph.' : 'Choose a phone and a point on the map.';
 }
 
+function handoffPhone() {
+  const device = state.devices.find(device => device.id === (state.session?.deviceId || selectedDeviceId));
+  return (state.preferences.connection || 'usb') === 'usb' && device?.connection === 'usb' && device.state === 'ready' &&
+    (!state.session || state.session.status === 'active') ? device : null;
+}
 function renderConnections() {
   const mode = state.preferences.connection || 'usb';
-  const blocked = pending || state.busy || Boolean(state.session);
+  const busy = pending || state.busy, phone = handoffPhone();
   $('#connection-options').textContent = `Connection: ${mode === 'wifi' ? 'Wi-Fi' : 'USB'} · Change`;
   document.querySelectorAll('[data-connection]').forEach(button => {
     button.setAttribute('aria-pressed', String(button.dataset.connection === mode));
-    button.disabled = blocked;
+    button.disabled = busy || (button.dataset.connection !== mode && Boolean(state.session) && !phone);
   });
-  $('#wifi-status').textContent = state.session ? 'Restore real location before changing connection methods. A disconnected Android phone can be reconnected below.' : pending || state.busy ? 'Checking the connection…' : `Using ${mode === 'wifi' ? 'Wi-Fi' : 'USB'}. ${state.devices.length} phone${state.devices.length === 1 ? '' : 's'} found.`;
-  $('#enable-iphone-wifi').disabled = blocked || mode !== 'usb' || state.devices.find(device => device.id === selectedDeviceId)?.platform !== 'ios';
+  $('#wifi-status').textContent = busy ? 'Checking the connection… Keep USB connected.' : phone ? 'Ready to switch. Ghost will check this same phone over Wi-Fi first.' : state.session?.status === 'active' && mode === 'wifi' ? 'Connected over Wi-Fi. Restore real location before returning to USB.' : state.session ? 'Retry or restore this phone’s session before switching.' : `Using ${mode === 'wifi' ? 'Wi-Fi' : 'USB'}. ${state.devices.length} phone${state.devices.length === 1 ? '' : 's'} found.`;
+  $('#wifi-handoff').hidden = !phone;
+  $('#switch-to-wifi').disabled = $('#wifi-prompt-switch').disabled = Boolean(busy);
+  $('#wifi-prompt-android').hidden = $('#wifi-android-note').hidden = phone?.platform !== 'android';
+  $('#wifi-prompt').hidden = !phone || state.session?.status !== 'active' || !state.network?.wifi || dismissedWifi.has(phone.id) || isPreview || !state.preferences.onboardingComplete;
+  $('#enable-iphone-wifi').disabled = busy || Boolean(state.session) || mode !== 'usb' || state.devices.find(device => device.id === selectedDeviceId)?.platform !== 'ios';
   const recoveringAndroid = state.session?.platform === 'android' && state.session?.connection === 'wifi' && ['waiting', 'unknown', 'error'].includes(state.session?.status);
-  $('#wifi-pair-button').disabled = $('#wifi-connect-button').disabled = pending || state.busy || (Boolean(state.session) && !recoveringAndroid) || mode !== 'wifi';
-  $('#wifi-refresh').disabled = pending || state.busy;
+  $('#wifi-pair-button').disabled = $('#wifi-connect-button').disabled = busy || (Boolean(state.session) && !recoveringAndroid) || mode !== 'wifi';
+  $('#wifi-refresh').disabled = busy;
   $('#wifi-ios').hidden = $('#wifi-phone').value !== 'ios';
   $('#wifi-android').hidden = $('#wifi-phone').value !== 'android';
+}
+async function switchToWifi() {
+  const phone = handoffPhone();
+  if (!phone) return;
+  const result = await runOperation(() => api.switchToWifi(phone.id), 'Connected over Wi-Fi. You can unplug the USB cable.');
+  if (result && $('#wifi-dialog').open) $('#wifi-dialog').close();
 }
 
 function render() { renderConnections(); renderView(); renderDevices(); renderDestination(); renderActions(); renderRoute(); renderSaved(); renderSession(); renderRuntime(); renderSetup(); if ($('#onboarding-dialog').open) renderOnboarding(); paintIcons(); }
@@ -589,13 +608,16 @@ $('#onboarding-dialog').addEventListener('cancel', (event) => { if (state.prefer
 
 $('#connection-options').onclick = () => {
   $('#wifi-phone').value = setupPlatform || 'ios';
+  $('#wifi-manual').open = !handoffPhone();
   renderConnections();
   $('#wifi-dialog').showModal();
 };
+$('#wifi-prompt-switch').onclick = $('#switch-to-wifi').onclick = switchToWifi;
+$('#wifi-prompt-dismiss').onclick = () => { const phone = handoffPhone(); if (phone) dismissedWifi.add(phone.id); renderConnections(); };
 $('#wifi-phone').onchange = renderConnections;
 $('#wifi-dialog').addEventListener('close', () => { $('#wifi-pair-code').value = ''; });
 document.querySelectorAll('[data-connection]').forEach(button => {
-  button.onclick = () => runOperation(() => api.setConnection(button.dataset.connection));
+  button.onclick = () => button.dataset.connection === 'wifi' && handoffPhone() ? switchToWifi() : runOperation(() => api.setConnection(button.dataset.connection));
 });
 $('#enable-iphone-wifi').onclick = () => runOperation(() => api.connectWifi({platform: 'ios', deviceId: selectedDeviceId}), 'Wi-Fi enabled. Choose Wi-Fi above to find your iPhone.');
 $('#wifi-pair-form').onsubmit = async event => {

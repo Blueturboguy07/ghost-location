@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.7
+
+- Offer Switch to Wi-Fi after a working USB session when the computer has an active Wi-Fi interface.
+- Replace the active-session connection lock with a same-phone handoff that carries the current point and resumes a running route.
+- Keep USB active during wireless discovery; try USB recovery if the new Wi-Fi session fails.
+- Add USB-assisted Android Wi-Fi setup and keep manual Android 11+ pairing available.
+- Add handoff, recovery, host-network and renderer regression coverage. Physical Wi-Fi handoff still needs device validation.
+
 ## 0.1.6
 
 - Add explicit USB and same-network Wi-Fi connection modes on Mac and Windows.
