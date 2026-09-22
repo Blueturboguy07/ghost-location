@@ -1,0 +1,16 @@
+name: bugfix-lab
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reproduce:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run oracle recipe
+        shell: pwsh
+        run: ./scripts/bugfix-lab/ghost-usb-device-not-detected.ps1
