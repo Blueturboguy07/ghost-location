@@ -22,8 +22,18 @@ npm --version
 Write-Host '--- npm ci ---'
 npm ci
 
-$env:GHOST_ADB_PATH = Join-Path $PWD 'scripts\bugfix-lab\mock-adb\mock-adb.cmd'
+Write-Host '--- compiling mock-adb.exe (Ghost spawns adb with shell:false; a .cmd/.bat is refused with EINVAL, so the stand-in must be a real .exe) ---'
+$csc = Get-ChildItem "$env:SystemRoot\Microsoft.NET\Framework64" -Recurse -Filter csc.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $csc) { $csc = Get-ChildItem "$env:SystemRoot\Microsoft.NET\Framework" -Recurse -Filter csc.exe -ErrorAction SilentlyContinue | Select-Object -First 1 }
+if (-not $csc) { throw 'ORACLE COULD NOT RUN: no csc.exe found to build the mock adb.exe stand-in.' }
+Write-Host "Using compiler: $($csc.FullName)"
+& $csc.FullName /nologo /target:exe /out:scripts\bugfix-lab\mock-adb\mock-adb.exe scripts\bugfix-lab\mock-adb\mock-adb.cs
+if ($LASTEXITCODE -ne 0) { throw 'ORACLE COULD NOT RUN: mock-adb.exe failed to compile.' }
+
+$env:GHOST_ADB_PATH = Join-Path $PWD 'scripts\bugfix-lab\mock-adb\mock-adb.exe'
 Write-Host "GHOST_ADB_PATH = $env:GHOST_ADB_PATH"
+& $env:GHOST_ADB_PATH version
+Write-Host "mock-adb.exe self-check exit code: $LASTEXITCODE"
 
 Write-Host '--- oracle-check.mjs (realistic authorized-USB-device adb output) ---'
 node scripts/bugfix-lab/oracle-check.mjs
