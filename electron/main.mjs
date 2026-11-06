@@ -9,6 +9,7 @@ import { IosAdapter } from '../backend/ios.mjs';
 import { AndroidAdapter } from '../backend/android.mjs';
 import { run } from '../backend/process.mjs';
 import { wifiStatus } from '../backend/network.mjs';
+import telemetry from './publik-telemetry.cjs';
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devUrl = !app.isPackaged && process.env.GHOST_DEV_URL === 'http://127.0.0.1:5173' ? process.env.GHOST_DEV_URL : null;
@@ -26,6 +27,8 @@ else {
 }
 
 async function boot() {
+  // Anonymous usage counts (app opened, active session) for installed builds only. See README "Usage counts".
+  if (app.isPackaged) telemetry.start('ghost', app.getVersion());
   const dist = path.join(rootPath, 'dist');
   protocol.handle('ghost', request => {
     const url = new URL(request.url);
