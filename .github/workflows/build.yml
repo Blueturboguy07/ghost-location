@@ -17,6 +17,10 @@ concurrency:
   group: native-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# publik telemetry is off on build machines: a test run is not a user.
+env:
+  DO_NOT_TRACK: "1"
+
 jobs:
   package:
     name: ${{ matrix.platform }}-${{ matrix.arch }}
