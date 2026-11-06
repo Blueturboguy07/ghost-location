@@ -33,7 +33,7 @@ The downloads include the phone runtimes. No programming tools or Ghost account 
 - Automatic stale recovery-record cleanup when a different usable USB phone appears.
 - Explicit restoration, normal-quit cleanup, and a persisted recovery journal.
 - Honest disconnected/error states: lost connectivity never means “restored”.
-- No account, telemetry, analytics, or cloud location history.
+- No account or cloud location history. The only telemetry is an anonymous usage count that you can turn off (see [Usage counts](#usage-counts)).
 
 ## Development
 
@@ -177,6 +177,14 @@ The OSRM demo service is for reasonable noncommercial use, capped at one request
 per second, with no uptime guarantee. Ghost requests it only on **Plan road route**.
 See [OSRM's demo policy](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server).
 A larger public deployment needs its own routing service instead of relying on the demo.
+
+## Usage counts
+
+Since 0.1.8, an installed Ghost build tells Publik that it was opened and, every 30 minutes, that it still runs.
+Each message holds the app name (`ghost`), the app version, the operating system, the processor type and a random
+install ID kept in the `publik` folder of your user account. It holds no location, no phone or device identifier and
+no other content. Turn it off with the environment variable `DO_NOT_TRACK=1` (or `PUBLIK_TELEMETRY=0`). A run from
+source (`npm run dev`, `npm start`) sends nothing. Details: <https://publikhq.com/skills/telemetry.md>.
 
 ## Build installers
 

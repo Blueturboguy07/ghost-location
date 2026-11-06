@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- Same app as 0.1.7, plus anonymous usage counts: installed builds tell Publik that the app opened and, every 30 minutes, that it still runs. No locations, device identifiers or other content are sent. `DO_NOT_TRACK=1` turns it off. See README, "Usage counts".
+
 ## 0.1.7
 
 - Offer Switch to Wi-Fi after a working USB session when the computer has an active Wi-Fi interface.

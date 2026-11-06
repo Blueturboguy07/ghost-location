@@ -101,7 +101,7 @@ The speed is constant, regardless of road limits or traffic. The blue dot repres
 
 ## Privacy and tested scope
 
-Ghost has no account or telemetry. Device identifiers, saved places, and a recovery record stay on the computer. Map viewing requests OpenStreetMap tiles, submitted searches go to Photon, and planning sends stop coordinates to OSRM. These public services have usage limits and no uptime guarantee. Route playback itself does not contact OSRM.
+Ghost has no account. Since 0.1.8 it sends an anonymous usage count (app opened, still running) to Publik; it holds no location or device identifier, and `DO_NOT_TRACK=1` turns it off (see the README, "Usage counts"). Device identifiers, saved places, and a recovery record stay on the computer. Map viewing requests OpenStreetMap tiles, submitted searches go to Photon, and planning sends stop coordinates to OSRM. These public services have usage limits and no uptime guarantee. Route playback itself does not contact OSRM.
 
 Mac → iPhone has been used successfully on a physical phone. Windows → iPhone, Windows → Android, and Mac → Android have software/adapter coverage; they have **not all been verified with physical USB phones**. Native installer builds are separate from end-to-end phone compatibility. See [validation](docs/validation.md) and the [hardware test matrix](docs/hardware-test-matrix.md).
 

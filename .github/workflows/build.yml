@@ -2,6 +2,11 @@ name: Build native desktop installers
 
 on:
   push:
+    # publik-build.yml builds the telemetry/** branches.
+    branches-ignore:
+      - 'telemetry/**'
+    tags:
+      - '**'
   pull_request:
   workflow_dispatch:
 
