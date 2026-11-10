@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, protocol, net, session, dialog, Menu, shel
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import { Store } from '../backend/store.mjs';
 import { Controller } from '../backend/controller.mjs';
 import { Geocoder } from '../backend/geocoder.mjs';
@@ -10,6 +11,8 @@ import { AndroidAdapter } from '../backend/android.mjs';
 import { run } from '../backend/process.mjs';
 import { wifiStatus } from '../backend/network.mjs';
 import telemetry from './publik-telemetry.cjs';
+import { createRequire } from 'node:module';
+import { RemoteServer } from '../backend/remote.mjs';
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devUrl = !app.isPackaged && process.env.GHOST_DEV_URL === 'http://127.0.0.1:5173' ? process.env.GHOST_DEV_URL : null;
@@ -17,7 +20,7 @@ if (!app.isPackaged) app.setPath('userData', process.env.GHOST_TEST_DATA || path
 app.setName('Ghost');
 protocol.registerSchemesAsPrivileged([{ scheme: 'ghost', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 
-let window, controller, poll, wakeLock, quitting = false, quitPending = false;
+let window, controller, remote, poll, wakeLock, quitting = false, quitPending = false;
 const geocoder = new Geocoder();
 const allowedExternal = new Set(['github.com', 'developer.android.com', 'developer.apple.com', 'support.apple.com', 'www.openstreetmap.org', 'openstreetmap.org', 'photon.komoot.io', 'doronz88.github.io']);
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -57,7 +60,39 @@ async function boot() {
     if (window && !window.isDestroyed()) window.webContents.send('ghost:state', state);
   });
 
+  const searchPlaces = query => { geocoder.configure(controller.state.preferences.geocoderUrl || 'https://photon.komoot.io/api/'); return geocoder.search(query); };
+  // Phone remote: off until enabled in Settings. Serves a page on the local network.
+  remote = new RemoteServer({ controller, search: searchPlaces, settingsPath: path.join(app.getPath('userData'), 'remote.json'),
+    assets: path.dirname(createRequire(import.meta.url).resolve('leaflet/dist/leaflet.js')) });
+
+  // Optional fixed iPhone address (for example Tailscale) so Wi-Fi mode works across networks.
+  const directPath = path.join(app.getPath('userData'), 'ios-address.json');
+  let direct = null;
+  try {
+    const saved = JSON.parse(await readFile(directPath, 'utf8'));
+    ios.setDirect({ host: saved.host, udid: saved.udid });
+    direct = { host: saved.host, udid: saved.udid, name: typeof saved.name === 'string' ? saved.name.slice(0, 120) : 'iPhone' };
+  } catch {}
+  const iosAddress = () => ({ host: direct?.host || '', name: direct?.name || '' });
+  const setIosAddress = async value => { await controller.exclusive(async () => {
+    if (controller.state.session && (controller.state.session.connection || 'usb') === 'wifi') throw new Error('Restore the current phone location before changing the iPhone address.');
+    const host = typeof value === 'string' ? value.trim() : '';
+    if (!host) { ios.setDirect(null); direct = null; await writeFile(directPath, '{}', { mode: 0o600 }); return; }
+    const phones = controller.state.devices.filter(device => device.platform === 'ios' && !['unauthorized', 'offline'].includes(device.state));
+    if (phones.length > 1) throw new Error('Connect only the iPhone this address belongs to.');
+    const phone = phones[0] ? { udid: phones[0].serial, name: phones[0].name } : direct;
+    if (!phone) throw new Error('Connect the iPhone by USB first so Ghost knows which phone this address belongs to.');
+    ios.setDirect({ host, udid: phone.udid });
+    direct = { host, udid: phone.udid, name: phone.name || 'iPhone' };
+    await writeFile(directPath, JSON.stringify(direct, null, 2), { mode: 0o600 });
+  }); return iosAddress(); };
+
   const handlers = {
+    getIosAddress: () => iosAddress(),
+    setIosAddress,
+    getRemote: () => remote.status(),
+    setRemote: value => remote.setEnabled(value === true),
+    resetRemoteLink: () => remote.resetLink(),
     getState: () => controller.snapshot(),
     switchToWifi: id => controller.switchToWifi(id),
     setConnection: value => controller.setConnection(value),
@@ -71,7 +106,7 @@ async function boot() {
     startRoute: value => controller.startRoute(value),
     pauseRoute: () => controller.pauseRoute(),
     resumeRoute: () => controller.resumeRoute(),
-    searchPlaces: query => { geocoder.configure(controller.state.preferences.geocoderUrl || 'https://photon.komoot.io/api/'); return geocoder.search(query); },
+    searchPlaces,
     savePlace: value => controller.savePlace(value),
     deletePlace: id => controller.deletePlace(id),
     updatePreferences: value => controller.updatePreferences(value),
@@ -122,6 +157,7 @@ async function boot() {
   else if (existsSync(path.join(dist, 'index.html'))) await window.loadURL('ghost://app/index.html');
   else throw new Error('Build the interface first with npm run build.');
   await controller.init();
+  await remote.init();
   poll = setInterval(() => controller.scanDevices().catch(error => { controller.state.warning = error.message; controller.notify(); }), 2000);
   powerMonitor.on('suspend', () => controller.suspend().catch(() => {}));
   powerMonitor.on('resume', () => controller.resume().catch(() => {}));
@@ -149,6 +185,7 @@ async function finishQuit() {
   }
   if (controller.state.session) await controller.sessionEnded({ deviceId: controller.state.session.deviceId, retry: false, error: 'Ghost quit without confirming restoration. Reconnect this phone and choose Retry location or Restore.' });
   clearInterval(poll);
+  await remote?.dispose().catch(() => {});
   if (wakeLock != null) { powerSaveBlocker.stop(wakeLock); wakeLock = null; }
   await Promise.race([controller.dispose({ restore: false }), new Promise(resolve => setTimeout(resolve, 6000))]);
   quitting = true; app.quit();

@@ -4,13 +4,16 @@ No request is acknowledged until the awaited upstream operation completes.
 The DVT set selector expects a device reply; clear is an upstream no-reply selector.
 """
 import asyncio
+import binascii
 from contextlib import AsyncExitStack, aclosing, suppress
 from contextvars import ContextVar
 from datetime import datetime, timezone
+import hmac
 import importlib.metadata
 import json
 import logging
 import math
+import platform
 import re
 import sys
 
@@ -25,10 +28,14 @@ logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 
 from packaging.version import Version
 from pymobiledevice3 import usbmux
-from pymobiledevice3.exceptions import AlreadyMountedError
-from pymobiledevice3.lockdown import create_using_usbmux, get_mobdev2_lockdowns
+from pymobiledevice3.exceptions import AlreadyMountedError, RemotePairingCompletedError
+from pymobiledevice3.common import get_home_folder
+from pymobiledevice3.lockdown import create_using_tcp, create_using_usbmux, get_mobdev2_lockdowns
+from pymobiledevice3.pair_records import get_preferred_pair_record, iter_remote_paired_identifiers
 from pymobiledevice3.remote import userspace_tunnel
-from pymobiledevice3.remote.tunnel_service import CoreDeviceTunnelProxy
+from pymobiledevice3.remote.tunnel_service import (CoreDeviceTunnelProxy, PairingDataComponentTLVBuf, PairingDataComponentType,
+                                                    RemotePairingLockdownService, RemotePairingProtocol,
+                                                    RemotePairingTunnelService)
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
 from pymobiledevice3.services.mobile_image_mounter import PersonalizedImageMounter, fetch_personalized_ddi
@@ -60,6 +67,144 @@ async def usb_lockdown(udid, autopair=False):
 # A request chooses its transport explicitly. Child tunnel tasks inherit this
 # context, while concurrent discovery and refresh tasks keep their own context.
 CONNECTION = ContextVar("ghost_connection", default="usb")
+# Optional direct network address (for example a Tailscale address) for one
+# specific iPhone. It replaces Bonjour discovery, which only works on a shared LAN.
+DIRECT = ContextVar("ghost_direct", default=None)
+DIRECT_TIMEOUT = 6.0
+
+
+def direct_target(params):
+    host, udid = params.get("host"), params.get("hostUdid", params.get("udid"))
+    if host in (None, ""):
+        return None
+    if (not isinstance(host, str) or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.:-]{0,251}[A-Za-z0-9])?", host) or
+            not isinstance(udid, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,80}", udid)):
+        raise ValueError("Enter the iPhone's network address, for example 100.64.0.2.")
+    return {"host": host, "udid": udid}
+
+
+async def direct_lockdown(udid, host):
+    """Dial one known address. The saved USB trust record must match this exact iPhone."""
+    record = await get_preferred_pair_record(udid, get_home_folder())
+    if record is None:
+        raise ConnectionError("This iPhone has no saved trust record. Connect it by USB and choose Switch to Wi-Fi once first.")
+    try:
+        async with asyncio.timeout(DIRECT_TIMEOUT):
+            lockdown = await create_using_tcp(hostname=host, autopair=False, pair_record=record, keep_alive=True)
+    except (TimeoutError, OSError, RecursionError) as error:
+        # iOS resets classic lockdown on VPN interfaces; pinned upstream then recurses.
+        raise ConnectionError(f"The iPhone did not answer at {host}. Check that both devices are connected to the same private network.") from error
+    if lockdown.udid == udid and lockdown.paired:
+        return lockdown
+    await lockdown.close()
+    raise ConnectionError(f"The device at {host} is not the trusted iPhone selected in Ghost.")
+
+
+# iOS refuses classic lockdown on VPN interfaces (for example Tailscale) but serves
+# RemotePairing there. That route needs its own pairing record, created once over USB.
+REMOTE_SERVICE = ContextVar("ghost_remote_service", default=None)
+REMOTE_PORT = 49152
+REMOTE_PORTS = {}
+REMOTE_TIMEOUT = 8.0
+
+
+async def verified_proof(self):
+    """Pinned upstream compares the device's SRP proof in mismatched encodings and always fails."""
+    client_public = binascii.unhexlify(self.srp_context.public)
+    tlv = PairingDataComponentTLVBuf.build([
+        {"type": PairingDataComponentType.STATE, "data": b"\x03"},
+        {"type": PairingDataComponentType.PUBLIC_KEY, "data": client_public[:255]},
+        {"type": PairingDataComponentType.PUBLIC_KEY, "data": client_public[255:]},
+        {"type": PairingDataComponentType.PROOF, "data": binascii.unhexlify(self.srp_context.key_proof)},
+    ])
+    response = await self._send_receive_pairing_data({
+        "data": tlv, "kind": "setupManualPairing", "sendingHost": platform.node(), "startNewSession": False})
+    data = self.decode_tlv(PairingDataComponentTLVBuf.parse(response))
+    expected = self.srp_context.key_proof_hash
+    expected = expected.decode() if isinstance(expected, bytes) else str(expected)
+    received = data.get(PairingDataComponentType.PROOF, b"").hex()
+    if not hmac.compare_digest(received.lower(), expected.lower()):
+        raise ConnectionError("The iPhone did not prove the pairing secret.")
+
+
+RemotePairingProtocol._verify_proof = verified_proof
+
+
+def remote_paired(udid):
+    return udid in set(iter_remote_paired_identifiers())
+
+
+def device_note(udid):
+    return get_home_folder() / f"ghost_{udid}.json"
+
+
+def remember_device(udid, name, version):
+    with suppress(Exception):
+        device_note(udid).write_text(json.dumps({"name": str(name)[:120], "osVersion": str(version)[:40]}), encoding="utf-8")
+
+
+def recall_device(udid):
+    try:
+        saved = json.loads(device_note(udid).read_text(encoding="utf-8"))
+        return {"name": str(saved.get("name") or "iPhone")[:120], "osVersion": str(saved.get("osVersion") or "")[:40]}
+    except Exception:
+        return {"name": "iPhone", "osVersion": ""}
+
+
+async def pair_remote(lockdown):
+    """Validate or create the RemotePairing record over trusted USB; no prompt on the phone."""
+    service = await RemotePairingLockdownService.create(lockdown)
+    try:
+        async with asyncio.timeout(30):
+            await service.connect(autopair=True)
+    except RemotePairingCompletedError:
+        pass
+    finally:
+        await service.close()
+
+
+async def open_ports(host):
+    """The service port is dynamic and Bonjour cannot cross routed networks, so look for it."""
+    limit, found = asyncio.Semaphore(256), []
+
+    async def probe(port):
+        async with limit:
+            with suppress(TimeoutError, OSError):
+                async with asyncio.timeout(2):
+                    _reader, writer = await asyncio.open_connection(host, port)
+                writer.close()
+                found.append(port)
+
+    await asyncio.gather(*(probe(port) for port in range(49152, 65536)))
+    return sorted(found)
+
+
+async def remote_attempt(udid, host, port, timeout):
+    service = RemotePairingTunnelService(udid, host, port)
+    try:
+        async with asyncio.timeout(timeout):
+            # Pair-verify succeeds only for the iPhone holding this record's keys.
+            await service.connect(autopair=False)
+    except BaseException:
+        with suppress(Exception):
+            await service.close()
+        raise
+    REMOTE_PORTS[host] = port
+    return service
+
+
+async def remote_service(udid, host):
+    tried = []
+    for port in (REMOTE_PORTS.get(host), REMOTE_PORT):
+        if port and port not in tried:
+            tried.append(port)
+            with suppress(Exception):
+                return await remote_attempt(udid, host, port, REMOTE_TIMEOUT)
+    for port in await open_ports(host):
+        if port not in tried:
+            with suppress(Exception):
+                return await remote_attempt(udid, host, port, 4)
+    raise ConnectionError(f"The iPhone did not answer at {host}. Check that both devices are connected to the same private network.")
 
 
 async def connection_lockdown(udid, autopair=False):
@@ -67,18 +212,33 @@ async def connection_lockdown(udid, autopair=False):
         return await usb_lockdown(udid, autopair=autopair)
     if not isinstance(udid, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,80}", udid):
         raise ValueError("A specific iPhone identifier is required.")
-    async with asyncio.timeout(8):
-        async with aclosing(get_mobdev2_lockdowns(only_paired=True, timeout=2)) as devices:
-            async for _address, lockdown in devices:
-                # Bonjour names and pairing records alone do not establish identity.
-                if lockdown.udid == udid and lockdown.paired:
-                    return lockdown
-                await lockdown.close()
+    direct = DIRECT.get()
+    direct_error = None
+    if direct and direct["udid"] == udid:
+        try:
+            return await direct_lockdown(udid, direct["host"])
+        except ConnectionError as error:
+            # Same-network discovery remains a valid route when the saved address is down.
+            direct_error = error
+    with suppress(TimeoutError):
+        async with asyncio.timeout(8):
+            async with aclosing(get_mobdev2_lockdowns(only_paired=True, timeout=2)) as devices:
+                async for _address, lockdown in devices:
+                    # Bonjour names and pairing records alone do not establish identity.
+                    if lockdown.udid == udid and lockdown.paired:
+                        return lockdown
+                    await lockdown.close()
+    if direct_error:
+        raise direct_error
     raise ConnectionError("This trusted iPhone was not found on Wi-Fi. Unlock it, use the same network and enable Wi-Fi over USB first.")
 
 
 async def strict_usb_provider(serial, autopair, remotepairing_fallback=False):
     """Use only the requested transport; retain the pinned rootless tunnel lifecycle."""
+    service = REMOTE_SERVICE.get()
+    if service is not None:
+        # connect() already authenticated this exact iPhone on its private address.
+        return service, None
     lockdown = await connection_lockdown(serial, autopair=False)
     try:
         if not lockdown.paired:
@@ -114,12 +274,26 @@ class Bridge:
             item.update(state="setup-required", detail="Enable Developer Mode in Settings → Privacy & Security.")
         else:
             item.update(state="ready", detail=f"{'Wi-Fi' if connection == 'wifi' else 'USB'} connected. Developer Mode enabled.")
+            if connection == "usb":
+                remember_device(lockdown.udid, item["name"], item["osVersion"])
         return item
 
     async def discover(self):
         result = []
         if CONNECTION.get() == "wifi":
             seen = set()
+            direct = DIRECT.get()
+            if direct:
+                item = await self.discover_remote(direct)
+                if item:
+                    return [item]
+                # A known address answers faster than Bonjour and works across routed networks.
+                with suppress(Exception):
+                    async with await direct_lockdown(direct["udid"], direct["host"]) as lockdown:
+                        result.append(await self.describe(lockdown, "wifi"))
+                        seen.add(lockdown.udid)
+                if result:
+                    return result
             # Bound Bonjour discovery so an unreachable paired phone cannot hang a scan.
             try:
                 async with asyncio.timeout(8):
@@ -153,9 +327,51 @@ class Bridge:
             # Cache the existing trusted record for authenticated Bonjour discovery.
             await lockdown.save_pair_record()
             await lockdown.set_enable_wifi_connections(True)
+            try:
+                # Classic Wi-Fi sync is refused on VPN interfaces; this pairing is what works there.
+                await pair_remote(lockdown)
+            except Exception as error:
+                logging.warning("Private-network pairing was not completed: %s", explain(error))
         return {"enabled": True, "message": "Wi-Fi enabled. Keep both devices on the same network, then choose Wi-Fi in Ghost."}
 
-    async def prepare(self, udid):
+    async def discover_remote(self, direct):
+        udid = direct["udid"]
+        if not remote_paired(udid):
+            return None
+        session = self.session
+        if not (session and session["udid"] == udid and session.get("remote") and self.session_usable(session)):
+            try:
+                await (await remote_service(udid, direct["host"])).close()
+            except Exception:
+                return None
+        known = recall_device(udid)
+        return {"id": f"ios:{udid}", "serial": udid, "platform": "ios", "name": known["name"],
+                "osVersion": known["osVersion"], "connection": "wifi", "state": "ready",
+                "detail": "Connected through your private network."}
+
+    async def remote_or_none(self, udid):
+        direct = DIRECT.get()
+        if CONNECTION.get() != "wifi" or not direct or direct["udid"] != udid or not remote_paired(udid):
+            return None
+        try:
+            return await remote_service(udid, direct["host"])
+        except ConnectionError:
+            # A phone on the same LAN is still reachable through the classic route.
+            return None
+
+    async def ensure_image(self, provider):
+        async with PersonalizedImageMounter(provider) as mounter:
+            if not await mounter.is_image_mounted("Personalized"):
+                # Keep potentially slow first-run download off the session event loop.
+                image, manifest, trustcache = await asyncio.to_thread(fetch_personalized_ddi)
+                with suppress(AlreadyMountedError):
+                    await mounter.mount(image, manifest, trustcache)
+
+    async def prepare(self, udid, remote=True):
+        service = await self.remote_or_none(udid) if remote else None
+        if service is not None:
+            await service.close()
+            return {"ready": True, "message": "iPhone is reachable through your private network."}
         async with await connection_lockdown(udid, autopair=True) as lockdown:
             if not lockdown.paired:
                 raise RuntimeError("Unlock the iPhone and trust this computer.")
@@ -163,12 +379,7 @@ class Bridge:
                 raise RuntimeError("This version requires iOS 17.4 or later.")
             if not await lockdown.get_developer_mode_status():
                 raise RuntimeError("Enable Developer Mode in Settings → Privacy & Security, restart, and confirm it.")
-            async with PersonalizedImageMounter(lockdown) as mounter:
-                if not await mounter.is_image_mounted("Personalized"):
-                    # Keep potentially slow first-run download off the session event loop.
-                    image, manifest, trustcache = await asyncio.to_thread(fetch_personalized_ddi)
-                    with suppress(AlreadyMountedError):
-                        await mounter.mount(image, manifest, trustcache)
+            await self.ensure_image(lockdown)
         return {"ready": True, "message": "iPhone developer services are ready."}
 
     async def connect(self, udid):
@@ -179,6 +390,9 @@ class Bridge:
                 # A new lockdown connection after replug says nothing about the old
                 # DVT stream. Check its lifetime both before and after the USB probe.
                 session = self.session
+                if self.session_usable(session) and session.get("remote"):
+                    # No lockdown exists on this route; the DVT stream is the liveness signal.
+                    return session
                 if self.session_usable(session):
                     try:
                         async with await connection_lockdown(udid):
@@ -190,13 +404,18 @@ class Bridge:
                 await self.fail_session(session, "iPhone developer connection ended. Location state is unknown.")
             else:
                 raise RuntimeError("Restore the active iPhone location before switching devices.")
-        await self.prepare(udid)
+        service = await self.remote_or_none(udid)
+        if service is None:
+            await self.prepare(udid, remote=False)
         stack = AsyncExitStack()
+        token = REMOTE_SERVICE.set(service)
         try:
             tunnel = userspace_tunnel.UserspaceRsdTunnel(serial=udid, autopair=False, remotepairing_fallback=False)
             rsd = await stack.enter_async_context(tunnel)
             if rsd.udid != udid:
                 raise RuntimeError("Connected iPhone does not match the selected device.")
+            if service is not None:
+                await self.ensure_image(rsd)
             dvt = await stack.enter_async_context(DvtProvider(rsd))
             location = await stack.enter_async_context(LocationSimulation(dvt))
         except BaseException:
@@ -205,8 +424,14 @@ class Bridge:
             except BaseException as error:
                 self.transport_error = error
                 raise
+            finally:
+                if service is not None:
+                    with suppress(Exception):
+                        await service.close()
             raise
-        session = {"udid": udid, "connection": CONNECTION.get(), "stack": stack, "dvt": dvt, "tunnel": tunnel,
+        finally:
+            REMOTE_SERVICE.reset(token)
+        session = {"udid": udid, "connection": CONNECTION.get(), "remote": service is not None, "stack": stack, "dvt": dvt, "tunnel": tunnel,
                    "location": location, "active": False, "valid": True, "target": None}
         self.session = session
         session["watcher"] = asyncio.create_task(self.watch_session(session))
@@ -302,10 +527,13 @@ class Bridge:
         connection = params.get("connection", "usb")
         if connection not in ("usb", "wifi"):
             raise ValueError("Choose USB or Wi-Fi.")
+        direct = direct_target(params) if connection == "wifi" else None
         token = CONNECTION.set(connection)
+        direct_token = DIRECT.set(direct)
         try:
             return await self._dispatch(method, params)
         finally:
+            DIRECT.reset(direct_token)
             CONNECTION.reset(token)
 
     async def _dispatch(self, method, params):

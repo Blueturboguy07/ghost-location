@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('ghost', Object.freeze({
   deletePlace: id => invoke('deletePlace', id),
   updatePreferences: value => invoke('updatePreferences', value),
   installRuntime: () => invoke('installRuntime'),
+  getIosAddress: () => invoke('getIosAddress'),
+  setIosAddress: value => invoke('setIosAddress', value),
+  getRemote: () => invoke('getRemote'),
+  setRemote: value => invoke('setRemote', value),
+  resetRemoteLink: () => invoke('resetRemoteLink'),
   onState: callback => {
     if (typeof callback !== 'function') throw new Error('A callback is required.');
     const listener = (_event, state) => callback(state);

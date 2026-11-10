@@ -302,6 +302,172 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
         finally:
             bridge_module.CONNECTION.reset(token)
 
+    async def test_direct_address_dials_only_the_trusted_exact_phone(self):
+        wanted = "00008030-0000000000000001"
+        selected = SimpleNamespace(udid=wanted, paired=True, close=AsyncMock())
+        dial = AsyncMock(return_value=selected)
+        async def no_bonjour(**kwargs):
+            raise AssertionError("Bonjour must not run when the saved address answers")
+            yield None
+        token = bridge_module.CONNECTION.set("wifi")
+        direct = bridge_module.DIRECT.set(bridge_module.direct_target({"host": "100.64.0.2", "udid": wanted}))
+        try:
+            with patch.object(bridge_module, "create_using_tcp", dial), \
+                    patch.object(bridge_module, "get_preferred_pair_record", AsyncMock(return_value={"HostID": "x"})), \
+                    patch.object(bridge_module, "get_mobdev2_lockdowns", no_bonjour), \
+                    patch.object(bridge_module, "usb_lockdown", AsyncMock()) as usb:
+                self.assertIs(await bridge_module.connection_lockdown(wanted), selected)
+                usb.assert_not_awaited()
+            self.assertEqual(dial.await_args.kwargs["hostname"], "100.64.0.2")
+            self.assertFalse(dial.await_args.kwargs["autopair"])
+            self.assertEqual(dial.await_args.kwargs["pair_record"], {"HostID": "x"})
+        finally:
+            bridge_module.DIRECT.reset(direct)
+            bridge_module.CONNECTION.reset(token)
+
+    async def test_direct_address_rejects_other_phones_and_missing_trust(self):
+        wanted = "00008030-0000000000000001"
+        stranger = SimpleNamespace(udid="00008030-0000000000000002", paired=True, close=AsyncMock())
+        with patch.object(bridge_module, "create_using_tcp", AsyncMock(return_value=stranger)), \
+                patch.object(bridge_module, "get_preferred_pair_record", AsyncMock(return_value={"HostID": "x"})):
+            with self.assertRaisesRegex(ConnectionError, "not the trusted iPhone"):
+                await bridge_module.direct_lockdown(wanted, "100.64.0.2")
+        stranger.close.assert_awaited_once()
+        dial = AsyncMock()
+        with patch.object(bridge_module, "create_using_tcp", dial), \
+                patch.object(bridge_module, "get_preferred_pair_record", AsyncMock(return_value=None)):
+            with self.assertRaisesRegex(ConnectionError, "no saved trust record"):
+                await bridge_module.direct_lockdown(wanted, "100.64.0.2")
+        dial.assert_not_awaited()
+
+    async def test_direct_address_failure_falls_back_to_local_discovery_then_reports_address(self):
+        wanted = "00008030-0000000000000001"
+        selected = SimpleNamespace(udid=wanted, paired=True, close=AsyncMock())
+        found = [selected]
+        async def network_devices(**kwargs):
+            for item in found:
+                yield "192.168.1.20", item
+        token = bridge_module.CONNECTION.set("wifi")
+        direct = bridge_module.DIRECT.set({"host": "100.64.0.2", "udid": wanted})
+        try:
+            with patch.object(bridge_module, "create_using_tcp", AsyncMock(side_effect=OSError("unreachable"))), \
+                    patch.object(bridge_module, "get_preferred_pair_record", AsyncMock(return_value={"HostID": "x"})), \
+                    patch.object(bridge_module, "get_mobdev2_lockdowns", network_devices):
+                self.assertIs(await bridge_module.connection_lockdown(wanted), selected)
+                found.clear()
+                with self.assertRaisesRegex(ConnectionError, "did not answer at 100.64.0.2"):
+                    await bridge_module.connection_lockdown(wanted)
+        finally:
+            bridge_module.DIRECT.reset(direct)
+            bridge_module.CONNECTION.reset(token)
+
+    async def test_direct_address_is_validated_and_ignored_over_usb(self):
+        for bad in ("100.64.0.2/evil", "a b", "-x", 7):
+            with self.assertRaises(ValueError):
+                bridge_module.direct_target({"host": bad, "udid": "00008030-0000000000000001"})
+        with self.assertRaises(ValueError):
+            bridge_module.direct_target({"host": "100.64.0.2"})
+        self.assertIsNone(bridge_module.direct_target({"udid": "00008030-0000000000000001"}))
+        self.assertEqual(bridge_module.direct_target({"host": "iphone.tail1234.ts.net", "hostUdid": "00008030-0000000000000001"}),
+                         {"host": "iphone.tail1234.ts.net", "udid": "00008030-0000000000000001"})
+        bridge = bridge_module.Bridge()
+        seen = []
+        async def dispatch(method, params):
+            seen.append(bridge_module.DIRECT.get())
+            return {}
+        bridge._dispatch = dispatch
+        await bridge.dispatch("discover", {"connection": "usb", "host": "100.64.0.2", "hostUdid": "00008030-0000000000000001"})
+        await bridge.dispatch("discover", {"connection": "wifi", "host": "100.64.0.2", "hostUdid": "00008030-0000000000000001"})
+        self.assertEqual(seen, [None, {"host": "100.64.0.2", "udid": "00008030-0000000000000001"}])
+        self.assertIsNone(bridge_module.DIRECT.get())
+
+    async def test_private_network_route_is_preferred_and_never_dials_classic_lockdown(self):
+        wanted = "00008030-0000000000000001"
+        service = SimpleNamespace(close=AsyncMock())
+        bridge = bridge_module.Bridge()
+        params = {"connection": "wifi", "host": "100.64.0.2", "hostUdid": wanted}
+        with patch.object(bridge_module, "remote_paired", return_value=True), \
+                patch.object(bridge_module, "remote_service", AsyncMock(return_value=service)) as remote, \
+                patch.object(bridge_module, "recall_device", return_value={"name": "Phone", "osVersion": "27.0"}), \
+                patch.object(bridge_module, "create_using_tcp", AsyncMock(side_effect=AssertionError("classic dial"))):
+            found = await bridge.dispatch("discover", params)
+            ready = await bridge.dispatch("prepare", {"connection": "wifi", "host": "100.64.0.2", "udid": wanted})
+        self.assertEqual([(item["serial"], item["name"], item["connection"], item["state"]) for item in found],
+                         [(wanted, "Phone", "wifi", "ready")])
+        self.assertTrue(ready["ready"])
+        self.assertEqual(remote.await_args.args, (wanted, "100.64.0.2"))
+        self.assertEqual(service.close.await_count, 2)
+
+    async def test_private_network_route_needs_its_own_pairing_and_falls_back_when_down(self):
+        wanted = "00008030-0000000000000001"
+        bridge = bridge_module.Bridge()
+        token = bridge_module.CONNECTION.set("wifi")
+        direct = bridge_module.DIRECT.set({"host": "100.64.0.2", "udid": wanted})
+        try:
+            with patch.object(bridge_module, "remote_paired", return_value=False), \
+                    patch.object(bridge_module, "remote_service", AsyncMock()) as remote:
+                self.assertIsNone(await bridge.remote_or_none(wanted))
+                self.assertIsNone(await bridge.discover_remote({"host": "100.64.0.2", "udid": wanted}))
+                remote.assert_not_awaited()
+            with patch.object(bridge_module, "remote_paired", return_value=True), \
+                    patch.object(bridge_module, "remote_service", AsyncMock(side_effect=ConnectionError("down"))):
+                self.assertIsNone(await bridge.remote_or_none(wanted))
+                self.assertIsNone(await bridge.remote_or_none("00008030-0000000000000002"))
+        finally:
+            bridge_module.DIRECT.reset(direct)
+            bridge_module.CONNECTION.reset(token)
+
+    async def test_private_network_service_tries_known_port_then_searches(self):
+        wanted, calls = "00008030-0000000000000001", []
+        service = SimpleNamespace(close=AsyncMock())
+        async def attempt(udid, host, port, timeout):
+            calls.append(port)
+            if port != 50111:
+                raise ConnectionError("not the pairing service")
+            bridge_module.REMOTE_PORTS[host] = port
+            return service
+        self.addCleanup(bridge_module.REMOTE_PORTS.clear)
+        with patch.object(bridge_module, "remote_attempt", attempt), \
+                patch.object(bridge_module, "open_ports", AsyncMock(return_value=[49152, 50111, 62000])) as scan:
+            self.assertIs(await bridge_module.remote_service(wanted, "100.64.0.2"), service)
+            self.assertEqual(calls, [49152, 50111])
+            calls.clear()
+            self.assertIs(await bridge_module.remote_service(wanted, "100.64.0.2"), service)
+            self.assertEqual(calls, [50111])
+            self.assertEqual(scan.await_count, 1)
+        with patch.object(bridge_module, "remote_attempt", AsyncMock(side_effect=OSError("refused"))), \
+                patch.object(bridge_module, "open_ports", AsyncMock(return_value=[])):
+            with self.assertRaisesRegex(ConnectionError, "did not answer at 100.64.0.9"):
+                await bridge_module.remote_service(wanted, "100.64.0.9")
+
+    async def test_tunnel_provider_uses_the_authenticated_private_service(self):
+        service = SimpleNamespace()
+        token = bridge_module.REMOTE_SERVICE.set(service)
+        try:
+            with patch.object(bridge_module, "connection_lockdown", AsyncMock(side_effect=AssertionError("lockdown"))):
+                self.assertEqual(await bridge_module.strict_usb_provider("00008030-0000000000000001", False), (service, None))
+        finally:
+            bridge_module.REMOTE_SERVICE.reset(token)
+
+    async def test_usb_pairing_for_private_networks_completes_and_checks_the_device_proof(self):
+        service = SimpleNamespace(connect=AsyncMock(side_effect=bridge_module.RemotePairingCompletedError()), close=AsyncMock())
+        with patch.object(bridge_module.RemotePairingLockdownService, "create", AsyncMock(return_value=service)):
+            await bridge_module.pair_remote(SimpleNamespace(udid="00008030-0000000000000001"))
+        self.assertTrue(service.connect.await_args.kwargs["autopair"])
+        service.close.assert_awaited_once()
+
+        proof = bytes(range(64))
+        def protocol(expected):
+            return SimpleNamespace(
+                srp_context=SimpleNamespace(public="ab" * 384, key_proof="cd" * 64, key_proof_hash=expected),
+                _send_receive_pairing_data=AsyncMock(return_value=b"reply"),
+                decode_tlv=lambda _items: {bridge_module.PairingDataComponentType.PROOF: proof})
+        with patch.object(bridge_module.PairingDataComponentTLVBuf, "parse", return_value=[]):
+            await bridge_module.verified_proof(protocol(proof.hex().encode()))
+            await bridge_module.verified_proof(protocol(proof.hex().upper()))
+            with self.assertRaisesRegex(ConnectionError, "pairing secret"):
+                await bridge_module.verified_proof(protocol("00" * 64))
+
     async def test_wifi_missing_phone_never_falls_back_to_usb(self):
         async def network_devices(**kwargs):
             if False:

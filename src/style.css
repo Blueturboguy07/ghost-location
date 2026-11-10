@@ -438,3 +438,5 @@ dialog[open] { animation: rise .18s ease-out; }
 .wifi-prompt > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 #wifi-manual { margin: 24px 0; }
 #wifi-manual summary { cursor: pointer; font-weight: 500; margin-bottom: 20px; }
+
+.remote-link strong { font-size: 13px; color: #1d1d1f; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
