@@ -25,6 +25,20 @@ export class IosAdapter {
     this.closed = false;
     this.queue = Promise.resolve();
     this.stderr = '';
+    this.direct = null;
+  }
+
+  /** Optional fixed network address for one iPhone, used before same-network discovery. */
+  setDirect(direct) {
+    if (direct == null) { this.direct = null; this.invalidateDeviceCache(); return; }
+    const { host, udid } = direct;
+    if (typeof host !== 'string' || !/^[A-Za-z0-9](?:[A-Za-z0-9.:-]{0,251}[A-Za-z0-9])?$/.test(host)) throw new Error('Enter the iPhone network address, for example 100.64.0.2.');
+    if (typeof udid !== 'string' || !/^[A-Za-z0-9-]{8,80}$/.test(udid)) throw new Error('Connect the iPhone by USB once so Ghost knows which phone this address belongs to.');
+    this.direct = { host, udid };
+    this.invalidateDeviceCache();
+  }
+  discoverParams(connection) {
+    return { connection, ...(connection === 'wifi' && this.direct ? { host: this.direct.host, hostUdid: this.direct.udid } : {}) };
   }
 
   runtime() {
@@ -163,7 +177,7 @@ export class IosAdapter {
     if (!device || device.platform !== 'ios' || device.connection !== (this.connection || 'usb') ||
         typeof device.serial !== 'string' || !/^[A-Za-z0-9-]{8,80}$/.test(device.serial) ||
         device.id !== `ios:${device.serial}`) throw new Error('Select an iPhone on the current USB or Wi-Fi connection.');
-    return { udid: device.serial, ...(device.connection === 'wifi' ? {connection: 'wifi'} : {}) };
+    return { udid: device.serial, ...(device.connection === 'wifi' ? {connection: 'wifi', ...(this.direct?.udid === device.serial ? {host: this.direct.host} : {})} : {}) };
   }
 
   async status() {
@@ -177,13 +191,14 @@ export class IosAdapter {
       // this selected phone's presence than another independent lockdown probe.
       return [{ ...this.cachedDevice, state: 'ready', detail: `${this.cachedDevice.connection === 'wifi' ? 'Wi-Fi' : 'USB'} connection confirmed by location command acknowledgements.` }];
     }
-    const devices = await this.request('discover', {connection: this.connection || 'usb'});
+    const devices = await this.request('discover', this.discoverParams(this.connection || 'usb'));
     return devices.filter((device) => device.platform === 'ios' && device.connection === (this.connection || 'usb'));
   }
   async prepareWifi(device) {
     await this.enableWifi(device);
-    const devices = await this.request('discover', {connection: 'wifi'}, 15000);
+    const devices = await this.request('discover', this.discoverParams('wifi'), 15000);
     const wireless = devices.find(item => item.id === device.id && item.connection === 'wifi' && item.state === 'ready');
+    if (!wireless && this.direct?.udid === device.serial) throw new Error(`Your iPhone did not answer at ${this.direct.host} or on the local network. Keep it unlocked with its private network (for example Tailscale) connected on both devices, then try again.`);
     if (!wireless) throw new Error('Your iPhone is not reachable on Wi-Fi yet. Keep it unlocked on the same network, then try again.');
     return wireless;
   }

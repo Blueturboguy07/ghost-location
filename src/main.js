@@ -197,6 +197,8 @@ $('#app').innerHTML = `
     <div class="sheet-heading"><div><span class="eyebrow">Ghost</span><h2 id="settings-title">Settings</h2></div><button class="icon-button" data-close="settings-dialog" aria-label="Close settings">${icon('x')}</button></div>
     <div class="settings-group"><h3>Device setup</h3><div class="configuration-row"><div><strong id="settings-configuration">No setup selected</strong><small>Ghost uses this to show the right connection steps.</small></div><button id="rerun-onboarding" class="secondary-button compact">Change</button></div></div>
     <div class="settings-group"><h3>Location sessions</h3><label class="setting-row"><span><strong>Restore on quit</strong><small>Ghost tries to stop location simulation before it closes. Keep the phone connected.</small></span><input id="restore-preference" type="checkbox" class="switch" /></label></div>
+    <form id="ios-address-form" class="settings-group"><h3>iPhone across networks (experimental)</h3><label class="field-label" for="ios-address">iPhone private network address</label><input id="ios-address" class="text-input" type="text" maxlength="253" autocomplete="off" spellcheck="false" placeholder="100.64.0.2 (the iPhone's Tailscale address)" /><p id="ios-address-note" class="settings-note"></p><div class="button-row"><button type="submit" class="secondary-button compact">Save address</button><button id="ios-address-clear" type="button" class="text-button">Clear</button></div></form>
+    <div class="settings-group"><h3>Phone remote</h3><label class="setting-row"><span><strong>Control from the phone's browser</strong><small>Serves a page on your local network so you can pick a location on the phone itself. This computer still sends it, so keep Ghost open and the phone connected by USB or Wi-Fi.</small></span><input id="remote-preference" type="checkbox" class="switch" /></label><div id="remote-links"></div><button id="remote-reset" type="button" class="text-button" hidden>Create a new link</button></div>
     <div class="settings-group"><h3>Device tools</h3><div id="runtime-status"></div><button id="install-runtime" class="secondary-button">${icon('download')} Prepare device tools</button><p class="settings-note">First-time preparation may need an internet connection.</p></div>
     <form id="provider-form" class="settings-group"><h3>Place search</h3><label class="field-label" for="provider-url">Photon-compatible endpoint</label><input id="provider-url" class="text-input" type="url" required placeholder="https://photon.komoot.io/api/" /><p class="settings-note">Search runs only when you submit. Map tiles come from OpenStreetMap.</p><div class="button-row"><button type="submit" class="secondary-button compact">Save endpoint</button><button id="reset-provider" type="button" class="text-button">Reset</button></div></form><div class="settings-footer">Ghost 0.1.7 · Free and open source</div>
   </dialog>
@@ -562,7 +564,7 @@ $('#recenter-button').onclick = () => {
 $('#retry-map').onclick = () => { tileErrors = 0; $('#map-error').hidden = true; tiles.redraw(); };
 $('#connection-badge').onclick = openSetup;
 $('#help-button').onclick = openSetup;
-$('#settings-button').onclick = () => { $('#provider-url').value = state.preferences.geocoderUrl || 'https://photon.komoot.io/api/'; renderRuntime(); paintIcons(); $('#settings-dialog').showModal(); };
+$('#settings-button').onclick = () => { refreshRemote(); refreshIosAddress(); $('#provider-url').value = state.preferences.geocoderUrl || 'https://photon.komoot.io/api/'; renderRuntime(); paintIcons(); $('#settings-dialog').showModal(); };
 $('#scan-button').onclick = () => runOperation(() => api.scanDevices(), 'Device list refreshed.');
 $('#setup-scan').onclick = async () => { const result = await runOperation(() => api.scanDevices()); if (result && !result.devices.some((device) => device.platform === setupPlatform && device.state !== 'offline')) $('#setup-detection').textContent = `No ${platformName(setupPlatform)} found. Check the data cable, unlock the phone, and accept its prompt.`; };
 $('#change-configuration').onclick = openOnboarding;
@@ -583,6 +585,27 @@ $('#route-play').onclick = () => runOperation(() => state.route?.status === 'run
 $('#restore-button').onclick = () => runOperation(() => api.stopLocation(), 'Restore command accepted. Phone apps may need a moment to refresh.', 'restore');
 $('#toast-close').onclick = () => { $('#toast').hidden = true; clearTimeout(toastTimer); };
 $('#install-runtime').onclick = () => runOperation(() => api.installRuntime(), 'Device tools checked.');
+function renderIosAddress(value) {
+  $('#ios-address').value = value?.host || '';
+  $('#ios-address-note').textContent = value?.host ? `Saved for ${value.name || 'iPhone'}. In Wi-Fi mode Ghost dials this address before searching the local network.` : 'With the iPhone connected by USB, enter its Tailscale (or other private network) address. Wi-Fi mode can then reach it on any network where that address works. Not yet proven on real phones.';
+}
+async function refreshIosAddress() { if (!api.getIosAddress) return; try { renderIosAddress(await api.getIosAddress()); } catch {} }
+async function saveIosAddress(value, message) { if (!api.setIosAddress) return; try { renderIosAddress(await api.setIosAddress(value)); notify(message); } catch (error) { notify(error.message || 'The iPhone address could not be saved.', true); } }
+$('#ios-address-form').onsubmit = (event) => { event.preventDefault(); const value = $('#ios-address').value.trim(); saveIosAddress(value, value ? 'iPhone address saved. Use Switch to Wi-Fi to connect through it.' : 'iPhone address cleared.'); };
+$('#ios-address-clear').onclick = () => saveIosAddress('', 'iPhone address cleared.');
+function renderRemote(remote) {
+  $('#remote-preference').checked = Boolean(remote?.enabled);
+  $('#remote-reset').hidden = !remote?.enabled;
+  const links = remote?.links || [];
+  $('#remote-links').innerHTML = remote?.error ? `<p class="settings-note">${esc(remote.error)}</p>`
+    : !remote?.enabled ? ''
+    : !links.length ? '<p class="settings-note">This computer has no local network address yet. Connect to a network or turn on Mobile hotspot, then reopen Settings.</p>'
+    : `<p class="settings-note">Open one of these in Safari or Chrome on the phone, using the network both devices share. Anyone on that network with the link can set this phone's location.</p>${links.map(link => `<p class="settings-note remote-link"><strong>${esc(link.url)}</strong><br>${esc(link.network)}</p>`).join('')}<p class="settings-note">If the page does not load, allow Ghost through Windows Firewall for this network.</p>`;
+}
+async function refreshRemote() { if (!api.getRemote) return; try { renderRemote(await api.getRemote()); } catch {} }
+async function remoteAction(action, message) { if (!api.getRemote) return; try { renderRemote(await action()); if (message) notify(message); } catch (error) { notify(error.message || 'Phone remote could not be changed.', true); refreshRemote(); } }
+$('#remote-preference').onchange = () => remoteAction(() => api.setRemote($('#remote-preference').checked));
+$('#remote-reset').onclick = () => remoteAction(() => api.resetRemoteLink(), 'New phone remote link created. The old link no longer works.');
 $('#restore-preference').onchange = () => runOperation(() => api.updatePreferences({ restoreOnQuit: $('#restore-preference').checked }));
 $('#provider-form').onsubmit = (event) => { event.preventDefault(); const url = $('#provider-url').value.trim(); try { if (new URL(url).protocol !== 'https:') throw new Error(); } catch { notify('Use a valid HTTPS URL for your search provider.', true); return; } runOperation(() => api.updatePreferences({ geocoderUrl: url }), 'Search endpoint saved.'); };
 $('#reset-provider').onclick = () => { $('#provider-url').value = 'https://photon.komoot.io/api/'; runOperation(() => api.updatePreferences({ geocoderUrl: 'https://photon.komoot.io/api/' }), 'Default search endpoint restored.'); };
