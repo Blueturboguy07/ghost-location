@@ -2,7 +2,10 @@ name: Publik build (usage telemetry v1)
 
 # Builds the unsigned apps for a Publik release. The Mac apps are signed, notarized and
 # stapled outside CI. This workflow uploads workflow artifacts only: it never creates,
-# changes or publishes a release.
+# changes or publishes a release. The build carries the publik app token from the
+# repository secret PUBLIK_APP_TOKEN (never printed), and each packaged app is checked
+# against a fake publik on the runner: the Sign in with publik gate, the self-test line
+# and the usage count.
 on:
   push:
     branches:
@@ -65,6 +68,10 @@ jobs:
           GHOST_BUILD_PYTHON: ${{ steps.python.outputs.python-path }}
       - name: Test adapters and sidecar
         run: npm test
+      - name: Put the publik app token into the build
+        env:
+          PUBLIK_APP_TOKEN: ${{ secrets.PUBLIK_APP_TOKEN }}
+        run: node scripts/publik-app-token.mjs --require
 
       # macOS: the unsigned .app only. The dmg and zip are made after signing.
       - name: Build unsigned Mac app
@@ -75,9 +82,10 @@ jobs:
           test -d "$APP"
           ditto -c -k --keepParent "$APP" "Ghost-mac-${{ matrix.arch }}-unsigned-app.zip"
           echo "GHOST_APP=$APP" >> "$GITHUB_ENV"
-      - name: Check usage telemetry in the packaged Mac app
+      - name: Check the sign-in gate and usage telemetry in the packaged Mac app
         if: matrix.platform == 'darwin'
         run: |
+          node .github/scripts/publik-self-test.cjs ghost "$GHOST_APP/Contents/MacOS/Ghost"
           node .github/scripts/publik-telemetry-smoke.mjs "$GHOST_APP/Contents/MacOS/Ghost"
           "$GHOST_APP/Contents/Resources/adb/darwin-${{ matrix.arch }}/adb" kill-server || true
       - name: Upload unsigned Mac app
@@ -90,11 +98,12 @@ jobs:
           compression-level: 0
           path: Ghost-mac-${{ matrix.arch }}-unsigned-app.zip
 
-      # Windows: the normal unsigned NSIS installer, then a silent install and a telemetry check.
+      # Windows: the normal unsigned NSIS installer, then a silent install, the publik self-test
+      # and the gate and telemetry check.
       - name: Build unsigned Windows installer
         if: matrix.platform == 'win32'
         run: npm run dist -- --publish never --${{ matrix.arch }}
-      - name: Install silently and check usage telemetry
+      - name: Install silently and check the sign-in gate and usage telemetry
         if: matrix.platform == 'win32'
         shell: pwsh
         run: |
@@ -106,6 +115,8 @@ jobs:
           if (-not (Test-Path $exe)) { $exe = Join-Path $env:LOCALAPPDATA 'Programs\Ghost\Ghost.exe' }
           if (-not (Test-Path $exe)) { throw 'The silent install did not produce Ghost.exe.' }
           Write-Host "Installed: $exe"
+          node .github/scripts/publik-self-test.cjs ghost $exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node .github/scripts/publik-telemetry-smoke.mjs $exe
           $result = $LASTEXITCODE
           $adb = Join-Path (Split-Path $exe) 'resources\adb\win32-x64\adb.exe'
