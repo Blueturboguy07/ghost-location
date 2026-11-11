@@ -22,3 +22,5 @@ artifacts/
 .env
 .env.*
 !.env.example
+# The publik app token of a release build (scripts/publik-app-token.mjs writes it). Never commit it.
+publik-app-token.txt

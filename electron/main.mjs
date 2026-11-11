@@ -9,7 +9,10 @@ import { IosAdapter } from '../backend/ios.mjs';
 import { AndroidAdapter } from '../backend/android.mjs';
 import { run } from '../backend/process.mjs';
 import { wifiStatus } from '../backend/network.mjs';
-import telemetry from './publik-telemetry.cjs';
+// The publik module: Sign in with publik at start-up and the usage counts (electron/publik.mjs).
+// The gate window is electron/publik-gate.mjs.
+import { ensureSignedIn } from './publik.mjs';
+import { electronGateUI } from './publik-gate.mjs';
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devUrl = !app.isPackaged && process.env.GHOST_DEV_URL === 'http://127.0.0.1:5173' ? process.env.GHOST_DEV_URL : null;
@@ -25,10 +28,22 @@ else {
   app.on('second-instance', () => { window?.show(); window?.focus(); });
   app.whenReady().then(boot).catch(error => { dialog.showErrorBox('Ghost could not start', error.message); app.exit(1); });
 }
+// The publik gate window closes before Ghost's window exists: that gap is not a quit. Closing the
+// gate by hand quits through the gate itself. Once Ghost's window exists, closing every window
+// quits, as before.
+app.on('window-all-closed', () => { if (window) app.quit(); });
 
 async function boot() {
-  // Anonymous usage counts (app opened, active session) for installed builds only. See README "Usage counts".
-  if (app.isPackaged) telemetry.start('ghost', app.getVersion());
+  // Every publik app opens with Sign in with publik. In an installed build the gate window comes
+  // first: the setup wizard, the device scan and the Local Network prompt start only after
+  // ensureSignedIn() returns. It then starts the usage counts (app_opened now, active_session
+  // every 30 minutes). PUBLIK_SELF_TEST=1 prints the self-test line and exits before any window.
+  // A run from source (npm run dev, npm start) skips the gate and sends no usage counts. See README.
+  if (app.isPackaged) {
+    const gate = electronGateUI({ appName: 'Ghost' });
+    await ensureSignedIn(gate);
+    gate.close();
+  }
   const dist = path.join(rootPath, 'dist');
   protocol.handle('ghost', request => {
     const url = new URL(request.url);
