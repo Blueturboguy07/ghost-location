@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9
+
+- Ghost opens with Sign in with publik. The sign-in window comes first; the setup wizard, the phone scan and the macOS Local Network prompt start only after you sign in. Ghost uses no AI, so there is no plan step. A run from source skips the sign-in.
+- One publik module (`electron/publik.mjs`) now does the sign-in and the usage counts. The counts start after the sign-in and carry this computer's publik key, so publik counts a signed-in person once. `DO_NOT_TRACK=1` or `PUBLIK_TELEMETRY=0` still turns them off.
+- CI checks the gate, the self-test line and the usage count in the packaged Mac and Windows apps against a local fake publik.
+
 ## 0.1.8
 
 - Same app as 0.1.7, plus anonymous usage counts: installed builds tell Publik that the app opened and, every 30 minutes, that it still runs. No locations, device identifiers or other content are sent. `DO_NOT_TRACK=1` turns it off. See README, "Usage counts".

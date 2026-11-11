@@ -5,7 +5,7 @@ place, drop a pin, or enter coordinates, then explicitly apply it to your select
 phone. Windows and macOS share one interface and use the appropriate iPhone or
 Android adapter.
 
-Current version: **0.1.7**. See [CHANGELOG.md](CHANGELOG.md) for the onboarding,
+Current version: **0.1.9**. See [CHANGELOG.md](CHANGELOG.md) for the sign-in, onboarding,
 interface, Android cleanup, Windows packaging, recovery-record, and reconnection changes.
 
 ![Ghost following an example road route in Chicago](docs/images/ghost-route.png)
@@ -14,10 +14,13 @@ interface, Android cleanup, Windows packaging, recovery-record, and reconnection
 
 ## Download and install
 
-Get [Ghost 0.1.7 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.7).
+Get [Ghost 0.1.9 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.9).
 Follow the [setup guide](SETUP.md) for Mac → iPhone, Windows → iPhone, Mac → Android, or Windows → Android, or use [Publik's guided install](https://publikhq.com/ghost/install).
 
-The downloads include the phone runtimes. No programming tools or Ghost account are needed. These early releases are unsigned; the guide explains opening them and the limits of current device testing.
+The downloads include the phone runtimes. No programming tools or Ghost account are needed. Ghost opens with
+**Sign in with publik**, so you need a publik account (see [Sign in with publik](#sign-in-with-publik)). The Mac
+downloads are signed with a Developer ID and notarized by Apple; the Windows installer is unsigned. The guide explains
+opening them and the limits of current device testing.
 
 ## Features
 
@@ -33,7 +36,7 @@ The downloads include the phone runtimes. No programming tools or Ghost account 
 - Automatic stale recovery-record cleanup when a different usable USB phone appears.
 - Explicit restoration, normal-quit cleanup, and a persisted recovery journal.
 - Honest disconnected/error states: lost connectivity never means “restored”.
-- No account or cloud location history. The only telemetry is an anonymous usage count that you can turn off (see [Usage counts](#usage-counts)).
+- No Ghost account and no cloud location history. Ghost opens with Sign in with publik. The only telemetry is a usage count that you can turn off (see [Usage counts](#usage-counts)).
 
 ## Development
 
@@ -178,13 +181,28 @@ per second, with no uptime guarantee. Ghost requests it only on **Plan road rout
 See [OSRM's demo policy](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server).
 A larger public deployment needs its own routing service instead of relying on the demo.
 
+## Sign in with publik
+
+Since 0.1.9, an installed Ghost build opens with a small **Sign in with publik** window. It comes first: the setup
+wizard, the phone scan and the macOS Local Network prompt start only after you sign in. Click **Sign in with publik**
+and sign in in your browser; the window continues by itself. If publik is not reachable, the window says so and shows
+**Retry**. Closing the window quits Ghost. Ghost uses no AI, so there is no plan or key step.
+
+To set up the sign-in, Ghost asks publik for a key for this computer once. It sends the app name and version, the
+operating system, the processor type and the computer name. The key is kept in the `publik` folder of your user
+account (`apps/ghost.json`; macOS: `~/Library/Application Support/publik`, Windows: `%LOCALAPPDATA%\publik`). At each start Ghost
+checks this key with publik and does not ask again while you stay signed in. One module, `electron/publik.mjs`, does the sign-in and the usage counts. A run
+from source (`npm run dev`, `npm start`) skips the sign-in.
+
 ## Usage counts
 
 Since 0.1.8, an installed Ghost build tells Publik that it was opened and, every 30 minutes, that it still runs.
+Since 0.1.9, it does this after the sign-in, with this computer's publik key, so publik counts a signed-in person once.
 Each message holds the app name (`ghost`), the app version, the operating system, the processor type and a random
 install ID kept in the `publik` folder of your user account. It holds no location, no phone or device identifier and
-no other content. Turn it off with the environment variable `DO_NOT_TRACK=1` (or `PUBLIK_TELEMETRY=0`). A run from
-source (`npm run dev`, `npm start`) sends nothing. Details: <https://publikhq.com/skills/telemetry.md>.
+no other content. Turn it off with the environment variable `DO_NOT_TRACK=1`, with `PUBLIK_TELEMETRY=0`, or with
+`"usage": false` in `consent.json` in the `publik` folder. A run from source (`npm run dev`, `npm start`) sends
+nothing. Details: <https://publikhq.com/skills/telemetry.md>.
 
 ## Build installers
 
@@ -202,6 +220,13 @@ release target yet. The packaging check refuses to produce an app with missing
 device runtimes. Release installers are unsigned. Signing/notarization credentials are required
 for a trusted macOS launch and a recognized Windows publisher.
 No publishing or repository upload is performed by these commands.
+
+A build that can sign in needs the publik app token of the `ghost` listing. Set `PUBLIK_APP_TOKEN` and run
+`node scripts/publik-app-token.mjs` before `npm run pack` or `npm run dist`: it writes
+`electron/publik-app-token.txt` (ignored by git), which the build packs into the app. Without it, the installed app
+shows "This build has no publik app token." `.github/workflows/publik-build.yml` does this with the repository secret
+`PUBLIK_APP_TOKEN`, then checks the sign-in gate, the `PUBLIK_SELF_TEST=1` line and the usage count of each packaged
+app against a fake publik on the runner.
 
 For v0.1.7, a macOS arm64 build produces `Ghost-0.1.7-mac-arm64.dmg` and
 `Ghost-0.1.7-mac-arm64.zip` in `release/`.

@@ -2,9 +2,10 @@ name: Build native desktop installers
 
 on:
   push:
-    # publik-build.yml builds the telemetry/** branches.
+    # publik-build.yml builds the telemetry/** branches and the signin-gate branch.
     branches-ignore:
       - 'telemetry/**'
+      - 'signin-gate'
     tags:
       - '**'
   pull_request:
