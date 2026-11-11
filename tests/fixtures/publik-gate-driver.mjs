@@ -4,6 +4,12 @@
 //   GATE_EXIT_ON: a screen id; the driver exits when that screen shows.
 import { writeSync } from 'node:fs';
 
+// Plain Node on Windows can stop with a libuv assertion (exit code 3221226505) when process.exit()
+// runs while a fetch socket still closes. Electron, where the module runs in Ghost, does not have
+// this fault (CI runs the self-test of the installed Windows app). Here process.exit() keeps the
+// exit code and the process ends by itself when nothing is left to run.
+if (process.platform === 'win32') process.exit = code => { process.exitCode = code ?? 0; };
+
 const { ensureSignedIn } = await import('../../electron/publik.mjs');
 const press = String(process.env.GATE_PRESS || '').split(',').filter(Boolean);
 // writeSync: a pipe on macOS and Windows is written later, and process.exit() would drop the line.
@@ -19,6 +25,9 @@ const ui = {
   openUrl(url) { out({ openUrl: url }); }
 };
 
-const gate = await ensureSignedIn(ui);
-out({ result: { claim_state: gate.wallet.claim_state, choice: gate.choice, key: gate.key.startsWith('pk_') ? 'pk_' : 'other' } });
-setTimeout(() => process.exit(0), Number(process.env.STAY_MS || 1500));
+// Not a top-level await: a gate that never resolves (a screen that waits) must not end the
+// module with exit code 13 ("unsettled top-level await").
+ensureSignedIn(ui).then(gate => {
+  out({ result: { claim_state: gate.wallet.claim_state, choice: gate.choice, key: gate.key.startsWith('pk_') ? 'pk_' : 'other' } });
+  setTimeout(() => process.exit(0), Number(process.env.STAY_MS || 1500));
+});
