@@ -1,0 +1,97 @@
+# Update feed: for one GitHub release of Ghost, makes the files the self-updater reads
+# (electron/publik-updater.cjs, docs/updates.md):
+#   latest.yml       + latest.yml.sig       Windows: the NSIS installer on the release
+#   latest-mac.yml   + latest-mac.yml.sig   macOS: the arm64 and x64 zips (Squirrel.Mac installs from a zip;
+#                                           each Mac takes the zip for its chip) and the two dmgs
+# The feed files carry ABSOLUTE asset URLs (https://github.com/<repo>/releases/download/<tag>/<file>) and
+# the sha512 of each file. The .sig files are minisign signatures made with the publik update key
+# (repo secrets PUBLIK_UPDATE_KEY and PUBLIK_UPDATE_KEY_PASSWORD); each one is verified against the public
+# key in electron/publik-update-verify.cjs before upload. publik serves these four files at
+# https://publikhq.com/api/updates/ghost/ from the scan-approved release.
+#
+# Run it once the release (a draft is fine) holds the installer files. It adds only the feed files that
+# are missing; "force" remakes them (after a file on the release was replaced). It never replaces an installer.
+#
+# build.yml (on a v* tag) and publik-build.yml (with a tag input) call it with "windows-artifact": the
+# workflow artifact of that run that holds the Windows installer. Then it first makes a DRAFT release for
+# the tag if the tag has no release, and adds the installer if the release has no .exe. The Mac zips and
+# dmgs are signed and notarized outside CI: upload them, then run this workflow again for latest-mac.yml.
+name: Update feed
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.1.9
+        required: true
+        type: string
+      force:
+        description: Remake feed files that already exist
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      force:
+        required: false
+        type: boolean
+        default: false
+      windows-artifact:
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-feed-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  feed:
+    name: Feed for ${{ inputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.18.0'
+      - name: Get the Windows installer of this run
+        if: ${{ inputs.windows-artifact != '' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ inputs.windows-artifact }}
+          path: windows-installer
+      - name: Put the Windows installer on the release (a draft is made if the tag has no release)
+        if: ${{ inputs.windows-artifact != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          exe="$(ls windows-installer/*.exe | head -1)"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Ghost ${TAG#v}" \
+              --notes "Draft made by CI with the Windows installer and its update feed. Add the signed Mac zips and dmgs, run Update feed, then publish."
+          fi
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qi '\.exe$'; then
+            echo "$TAG already has a Windows installer: kept"
+          else
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" "$exe"
+          fi
+      - name: Make, sign, verify and upload the missing feed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          FORCE: ${{ inputs.force && '--force' || '' }}
+          PUBLIK_UPDATE_KEY: ${{ secrets.PUBLIK_UPDATE_KEY }}
+          PUBLIK_UPDATE_KEY_PASSWORD: ${{ secrets.PUBLIK_UPDATE_KEY_PASSWORD }}
+        run: node scripts/publik-update-feed.cjs release --tag "$TAG" --app ghost --repo "$GITHUB_REPOSITORY" $FORCE

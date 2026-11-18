@@ -1,8 +1,10 @@
 name: Publik build (usage telemetry v1)
 
 # Builds the unsigned apps for a Publik release. The Mac apps are signed, notarized and
-# stapled outside CI. This workflow uploads workflow artifacts only: it never creates,
-# changes or publishes a release. The build carries the publik app token from the
+# stapled outside CI. By default this workflow uploads workflow artifacts only: it never creates,
+# changes or publishes a release. Run by hand with a tag, it also puts the Windows installer on
+# that tag's release (a draft is made if the tag has none; an .exe already there is kept) and adds
+# the signed update feed (update-feed.yml, docs/updates.md). It never publishes a release. The build carries the publik app token from the
 # repository secret PUBLIK_APP_TOKEN (never printed), and each packaged app is checked
 # against a fake publik on the runner: the Sign in with publik gate, the self-test line
 # and the usage count.
@@ -11,6 +13,12 @@ on:
     branches:
       - 'telemetry/**'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional: a release tag (vX.Y.Z). The Windows installer goes on its release (a draft is made if needed) with the signed update feed.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -18,6 +26,10 @@ permissions:
 concurrency:
   group: publik-build-${{ github.ref }}
   cancel-in-progress: true
+
+# The launch checks below do not check publik's update feed (electron/publik-updater.cjs).
+env:
+  PUBLIK_UPDATES: '0'
 
 jobs:
   package:
@@ -131,3 +143,17 @@ jobs:
           retention-days: 14
           compression-level: 0
           path: release/*.exe
+
+  # Run by hand with a tag: the Windows installer of this run goes on that release, then the signed
+  # update feed. latest-mac.yml follows once the signed Mac zips are on the release ("Update feed").
+  release:
+    name: Release files and update feed
+    needs: package
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/update-feed.yml
+    with:
+      tag: ${{ inputs.tag }}
+      windows-artifact: ghost-win-x64
+    secrets: inherit

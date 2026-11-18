@@ -204,6 +204,14 @@ no other content. Turn it off with the environment variable `DO_NOT_TRACK=1`, wi
 `"usage": false` in `consent.json` in the `publik` folder. A run from source (`npm run dev`, `npm start`) sends
 nothing. Details: <https://publikhq.com/skills/telemetry.md>.
 
+## Updates
+
+An installed Ghost checks publik's signed update feed (`https://publikhq.com/api/updates/ghost/`) at launch,
+every 24 hours and from **Check for Updates…** in the Ghost menu on macOS. It verifies the feed signature,
+downloads the update for this computer in the background, checks its sha512, and asks you to restart. The update
+replaces the whole app, phone runtimes included. Mac updates need releases signed with the same Developer ID.
+Details, the release steps, the feed contract, key rotation and roll back: [docs/updates.md](docs/updates.md).
+
 ## Build installers
 
 ```sh
@@ -247,8 +255,10 @@ and device-free launch smoke checks. Native target matching is required because
 electron-builder's `${platform}` resource macro resolves to `darwin` or `win32`
 from its build host. Cross-platform packaging and Windows ARM are excluded.
 
-CI uploads installers and provenance as workflow artifacts only; it does not
-publish a GitHub release, upload to a store, or use signing credentials. Passing
+CI uploads installers and provenance as workflow artifacts. On a `v*` tag it also
+puts the Windows installer on a DRAFT release for the tag with the signed update feed
+(`update-feed.yml`, see [docs/updates.md](docs/updates.md)); it never publishes a
+release, uploads to a store, or uses code-signing credentials. Passing
 CI does not verify real phones. Complete the hardware test matrix before claiming
 phone/OS compatibility.
 
