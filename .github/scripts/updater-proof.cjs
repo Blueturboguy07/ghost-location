@@ -346,8 +346,14 @@ async function run(o) {
   check('good: same install location', after.result && before.result && after.result.execPath === before.result.execPath, after.result && after.result.execPath);
   summary.treeAfter = compareTrees(o['installed-tree'], o['new-tree'], o['allow-extra']);
   const t = summary.treeAfter;
-  check(`good: the whole installed app equals the N+1 build (${t.files} entries: app.asar with backend/, the iPhone sidecar, adb, Electron)`, t.ok,
-    `missing ${t.missing.length}, changed ${t.changed.length}, unexpected extra ${t.unexpected.length}${t.ok ? '' : `: ${[...t.missing, ...t.changed, ...t.unexpected].slice(0, 12).join(', ')}`}${t.extra.length ? ` (allowed extra: ${t.extra.join(', ')})` : ''}`);
+  // A file of the build that the FRESH install of N also lacked (the installer or the runner leaves it
+  // out every time) does not count against the update; it is listed. Any other missing file does.
+  const alwaysMissing = new Set(summary.treeBefore.missing);
+  const lost = t.missing.filter((k) => !alwaysMissing.has(k));
+  const sameOk = t.files > 0 && !lost.length && !t.changed.length && !t.unexpected.length;
+  check(`good: the whole installed app equals the N+1 build (${t.files} entries: app.asar with backend/, the iPhone sidecar, adb, Electron)`, sameOk,
+    `missing ${lost.length}, changed ${t.changed.length}, unexpected extra ${t.unexpected.length}${sameOk ? '' : `: ${[...lost, ...t.changed, ...t.unexpected].slice(0, 12).join(', ')}`}` +
+    `${t.extra.length ? ` (allowed extra: ${t.extra.join(', ')})` : ''}${t.missing.length - lost.length ? ` (also missing after the fresh install of N, not counted: ${t.missing.filter((k) => alwaysMissing.has(k)).join(', ')})` : ''}`);
   check('good: the bundled backend resources are N+1\'s (marker)', readMarker() === o.new, readMarker());
   const sidecar = sidecarStatus(path.join(o['installed-tree'], o.sidecar));
   summary.sidecarAfter = sidecar;

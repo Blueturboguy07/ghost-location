@@ -167,6 +167,12 @@ jobs:
           if (!(Test-Path $exe)) { throw "installed Ghost.exe not found at $exe" }
           "GHOST_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "GHOST_DIR=$(Split-Path $exe)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # Diagnostic only: a fresh install on this runner has been seen without the sidecar's arm64
+          # wintun.dll, which the installer archive holds. Show whether it is there and what Defender saw.
+          $wintun = Join-Path (Split-Path $exe) 'resources\ios\win32-x64\ghost-ios\_internal\pytun_pmd3\wintun\bin'
+          Get-ChildItem -Recurse -File $wintun -ErrorAction SilentlyContinue | ForEach-Object { "{0} {1}" -f $_.Length, $_.FullName.Substring($wintun.Length) }
+          try { Get-MpComputerStatus | Select-Object AMServiceEnabled, RealTimeProtectionEnabled | Format-List | Out-String | Write-Host } catch { "Defender status: n/a" }
+          try { Get-MpThreatDetection | Select-Object -First 5 InitialDetectionTime, ThreatID, Resources | Format-List | Out-String | Write-Host } catch { "Defender detections: n/a" }
 
       - name: Put N+1 on a test prerelease
         env:
