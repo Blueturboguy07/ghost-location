@@ -1,0 +1,2 @@
+# The update-feed fixtures are signed: git must keep their bytes (no CRLF on Windows checkouts).
+tests/fixtures/update-feed/** -text

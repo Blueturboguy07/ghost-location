@@ -1,6 +1,6 @@
 {
   "name": "ghost-location",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Choose a place. Set your phone's location over USB or Wi-Fi.",
   "author": "Ghost contributors",
@@ -23,6 +23,8 @@
     "dist": "npm run build && node scripts/check-resources.mjs && electron-builder"
   },
   "dependencies": {
+    "blakejs": "1.2.1",
+    "electron-updater": "6.8.11",
     "leaflet": "1.9.4",
     "lucide": "^0.577.0"
   },
@@ -64,6 +66,10 @@
     "asar": true,
     "npmRebuild": false,
     "beforePack": "./scripts/check-resources.mjs",
+    "publish": {
+      "provider": "generic",
+      "url": "https://publikhq.com/api/updates/ghost/"
+    },
     "mac": {
       "target": [
         "dmg",

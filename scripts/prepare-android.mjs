@@ -77,7 +77,10 @@ async function prepareAdb(platform, arch) {
     let extract;
     if (process.platform === 'win32') {
       const quote = value => `'${value.replaceAll("'", "''")}'`;
-      extract = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath ${quote(archivePath)} -DestinationPath ${quote(extracted)} -ErrorAction Stop`], {timeoutMs: 60_000});
+      // The .NET Framework zip reader directly: on the windows-2025 runner image 20261116, Expand-Archive
+      // in Windows PowerShell can load an archive module that needs .NET Core ("Cannot find an overload
+      // for ExtractToDirectory and the argument count: 3").
+      extract = await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory(${quote(archivePath)}, ${quote(extracted)})`], {timeoutMs: 60_000});
     } else {
       extract = await run('/usr/bin/unzip', ['-q', archivePath, '-d', extracted], {timeoutMs: 60_000});
     }

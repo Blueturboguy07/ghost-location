@@ -1,0 +1,18 @@
+version: '9.9.9-fixture.1'
+publikApp: 'ghost'
+files:
+  - url: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-mac-arm64.zip'
+    sha512: 'PIipo4ORmf3zaiC0ZBJh6rgLitUeEQih0ObLZZewJ2a0ojoHBU8Y4aZnJBTUlfO3d6z/EtC8KvEUyibdNJrFNQ=='
+    size: 15
+  - url: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-mac-x64.zip'
+    sha512: '3EOPx3AyObFx88Mq0Q7xJLaGLbg41BrQEcSFqqMujVlMgbyIKu4CcUj7iHNJrxUXrk0cIB1bqss/u+jeBESiNA=='
+    size: 14
+  - url: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-mac-arm64.dmg'
+    sha512: 'O5uLCrrq5yrr3BXzhkQgUON00k9m9xjJ0+FMeUfonsARocf7OGYtI/bDp/uR9Os4X2yDML/0QM5VKLH0KpVmVw=='
+    size: 15
+  - url: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-mac-x64.dmg'
+    sha512: 'PeJ9SlFFVULAXuw2d4wTaQDyRs41nT8G2POnQsuweKtbBWdRgIfMXJS7ddl9EUqOr6sDhggdybF2P39sXfubLw=='
+    size: 14
+path: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-mac-arm64.zip'
+sha512: 'PIipo4ORmf3zaiC0ZBJh6rgLitUeEQih0ObLZZewJ2a0ojoHBU8Y4aZnJBTUlfO3d6z/EtC8KvEUyibdNJrFNQ=='
+releaseDate: '2026-11-18T00:00:00.000Z'

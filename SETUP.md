@@ -1,20 +1,20 @@
 # Ghost setup guide
 
-Ghost runs on your computer and sends simulated locations to a phone over a USB data cable or the same Wi-Fi network. It is free and open source. No Ghost account, API key, subscription, jailbreak, or root is needed.
+Ghost runs on your computer and sends simulated locations to a phone over a USB data cable or the same Wi-Fi network. It is free and open source. No Ghost account, API key, subscription, jailbreak, or root is needed. Ghost opens with **Sign in with publik**, so you need a publik account.
 
 ## Download and open
 
-Download **Ghost 0.1.7** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.7) or use the [Publik installation guide](https://publikhq.com/ghost/install).
+Download **Ghost 0.1.9** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.9) or use the [Publik installation guide](https://publikhq.com/ghost/install).
 
 | Your computer | Download |
 | --- | --- |
-| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.7-mac-arm64.dmg` |
-| Mac with an Intel processor | `Ghost-0.1.7-mac-x64.dmg` |
-| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.7-win-x64.exe` |
+| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.9-mac-arm64.dmg` |
+| Mac with an Intel processor | `Ghost-0.1.9-mac-x64.dmg` |
+| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.9-win-x64.exe` |
 
 On Mac, **Apple menu → About This Mac** identifies the chip. On Windows, look at **Settings → System → About → System type**. Windows ARM and Linux are not release targets. Native builds are checked on macOS 15 and Windows Server 2025; other OS versions have not been rehearsed.
 
-**Mac:** open the DMG, drag **Ghost** into **Applications**, then open it from Applications. The app is unsigned and not notarized. If macOS blocks the launch, check **System Settings → Privacy & Security → Open Anyway**. If it instead reports the app as damaged, first compare the download with `SHA256SUMS.txt` on the release page and download it again if the checksum differs. For a matching download that you choose to trust, the scoped command below removes its quarantine flag; it does not sign the app or verify its safety:
+**Mac:** open the DMG, drag **Ghost** into **Applications**, then open it from Applications. Since 0.1.8 the Mac app is signed with a Developer ID and notarized by Apple. If macOS still blocks the launch, check **System Settings → Privacy & Security → Open Anyway**. If it instead reports the app as damaged, first compare the download with `SHA256SUMS.txt` on the release page and download it again if the checksum differs. For a matching download that you choose to trust, the scoped command below removes its quarantine flag; it does not sign the app or verify its safety:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Ghost.app
@@ -101,7 +101,7 @@ The speed is constant, regardless of road limits or traffic. The blue dot repres
 
 ## Privacy and tested scope
 
-Ghost has no account. Since 0.1.8 it sends an anonymous usage count (app opened, still running) to Publik; it holds no location or device identifier, and `DO_NOT_TRACK=1` turns it off (see the README, "Usage counts"). Device identifiers, saved places, and a recovery record stay on the computer. Map viewing requests OpenStreetMap tiles, submitted searches go to Photon, and planning sends stop coordinates to OSRM. These public services have usage limits and no uptime guarantee. Route playback itself does not contact OSRM.
+Ghost has no account of its own. Since 0.1.9 it opens with Sign in with publik: to set up the sign-in, it sends publik the app version, the operating system, the processor type and the computer name once. After the sign-in it sends a usage count (app opened, still running) with this computer's publik key; the count holds no location or device identifier, and `DO_NOT_TRACK=1` turns it off (see the README, "Sign in with publik" and "Usage counts"). Device identifiers, saved places, and a recovery record stay on the computer. Map viewing requests OpenStreetMap tiles, submitted searches go to Photon, and planning sends stop coordinates to OSRM. These public services have usage limits and no uptime guarantee. Route playback itself does not contact OSRM.
 
 Mac → iPhone has been used successfully on a physical phone. Windows → iPhone, Windows → Android, and Mac → Android have software/adapter coverage; they have **not all been verified with physical USB phones**. Native installer builds are separate from end-to-end phone compatibility. See [validation](docs/validation.md) and the [hardware test matrix](docs/hardware-test-matrix.md).
 

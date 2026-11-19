@@ -2,11 +2,13 @@ name: Build native desktop installers
 
 on:
   push:
-    # publik-build.yml builds the telemetry/** branches.
+    # publik-build.yml builds the telemetry/** branches and the signin-gate branch.
     branches-ignore:
       - 'telemetry/**'
+      - 'signin-gate'
     tags:
       - '**'
+      - '!v*-updtest*' # v0.0.0-updtest.* tags belong to updater-proof.yml test runs
   pull_request:
   workflow_dispatch:
 
@@ -17,8 +19,10 @@ concurrency:
   group: native-build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# publik telemetry is off on build machines: a test run is not a user.
+# A build machine does not check publik's update feed (electron/publik-updater.cjs), and publik
+# telemetry is off on build machines: a test run is not a user.
 env:
+  PUBLIK_UPDATES: '0'
   DO_NOT_TRACK: "1"
 
 jobs:
@@ -98,3 +102,19 @@ jobs:
             resources/ios/**/build-dependencies.txt
             sidecar/build/**/warn-ghost-ios.txt
             release/builder-effective-config.yaml
+
+  # A v* tag: the Windows installer of this run goes on the tag's release (a draft is made if the tag has
+  # none; a release that already has an .exe keeps it), then the signed update feed (update-feed.yml):
+  # latest.yml now, latest-mac.yml once the signed Mac zips are on the release (run "Update feed" again).
+  # The Mac files of this workflow are unsigned and are never put on the release.
+  release:
+    name: Release files and update feed
+    needs: package
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-updtest') }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/update-feed.yml
+    with:
+      tag: ${{ github.ref_name }}
+      windows-artifact: Ghost-win32-x64-${{ github.sha }}
+    secrets: inherit

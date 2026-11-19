@@ -1,0 +1,9 @@
+version: '9.9.9-fixture.1'
+publikApp: 'ghost'
+files:
+  - url: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-win-x64.exe'
+    sha512: '9Di0PDcc3s4Ewm1iEHmAeNlAPAgzPOIGXKVdFtCwtnZl0/XPNexLkTONcyPaysHWAjZq8oacrjijQZRL1vhZ7A=='
+    size: 28
+path: 'https://github.com/Blueturboguy07/ghost-location/releases/download/v9.9.9-fixture.1/Ghost-9.9.9-fixture.1-win-x64.exe'
+sha512: '9Di0PDcc3s4Ewm1iEHmAeNlAPAgzPOIGXKVdFtCwtnZl0/XPNexLkTONcyPaysHWAjZq8oacrjijQZRL1vhZ7A=='
+releaseDate: '2026-11-18T00:00:00.000Z'

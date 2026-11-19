@@ -9,7 +9,12 @@ import { IosAdapter } from '../backend/ios.mjs';
 import { AndroidAdapter } from '../backend/android.mjs';
 import { run } from '../backend/process.mjs';
 import { wifiStatus } from '../backend/network.mjs';
-import telemetry from './publik-telemetry.cjs';
+// The publik module: Sign in with publik at start-up and the usage counts (electron/publik.mjs).
+// The gate window is electron/publik-gate.mjs.
+import { ensureSignedIn } from './publik.mjs';
+import { electronGateUI } from './publik-gate.mjs';
+// Signed self-updates from publik's update feed (electron/publik-updater.cjs, see docs/updates.md).
+import updater from './publik-updater.cjs';
 
 const rootPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const devUrl = !app.isPackaged && process.env.GHOST_DEV_URL === 'http://127.0.0.1:5173' ? process.env.GHOST_DEV_URL : null;
@@ -25,10 +30,30 @@ else {
   app.on('second-instance', () => { window?.show(); window?.focus(); });
   app.whenReady().then(boot).catch(error => { dialog.showErrorBox('Ghost could not start', error.message); app.exit(1); });
 }
+// The publik gate window closes before Ghost's window exists: that gap is not a quit. Closing the
+// gate by hand quits through the gate itself. Once Ghost's window exists, closing every window
+// quits, as before.
+app.on('window-all-closed', () => { if (window) app.quit(); });
 
 async function boot() {
-  // Anonymous usage counts (app opened, active session) for installed builds only. See README "Usage counts".
-  if (app.isPackaged) telemetry.start('ghost', app.getVersion());
+  // Updates: checks publik's signed update feed at launch and every 24 h, downloads in the background and
+  // asks for a restart; "Check for Updates…" is in Ghost's menu below. A test build started with
+  // PUBLIK_UPDATER_TEST runs the CI update proof and exits instead: nothing below starts (no gate, no
+  // window). An updater that cannot start does not stop Ghost from starting.
+  let updates = null;
+  try { updates = updater.startUpdates({ slug: 'ghost', appName: 'Ghost', menu: false }); }
+  catch (error) { console.warn('[updates] not started:', error.message); }
+  if (updates?.testHook) return;
+  // Every publik app opens with Sign in with publik. In an installed build the gate window comes
+  // first: the setup wizard, the device scan and the Local Network prompt start only after
+  // ensureSignedIn() returns. It then starts the usage counts (app_opened now, active_session
+  // every 30 minutes). PUBLIK_SELF_TEST=1 prints the self-test line and exits before any window.
+  // A run from source (npm run dev, npm start) skips the gate and sends no usage counts. See README.
+  if (app.isPackaged) {
+    const gate = electronGateUI({ appName: 'Ghost' });
+    await ensureSignedIn(gate);
+    gate.close();
+  }
   const dist = path.join(rootPath, 'dist');
   protocol.handle('ghost', request => {
     const url = new URL(request.url);
@@ -112,10 +137,11 @@ async function boot() {
   window.once('ready-to-show', () => window.show());
   window.on('close', event => { if (!quitting) { event.preventDefault(); app.quit(); } });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    ...(process.platform === 'darwin' ? [{ label: 'Ghost', submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] }] : []),
+    ...(process.platform === 'darwin' ? [{ label: 'Ghost', submenu: [{ role: 'about' }, { type: 'separator' }, ...(updates ? [updates.menuItem(), { type: 'separator' }] : []), { role: 'hide' }, { role: 'hideOthers' }, { type: 'separator' }, { role: 'quit' }] }] : []),
     { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
     { label: 'View', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }, ...(!app.isPackaged ? [{ role: 'toggleDevTools' }] : [])] },
-    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'close' }] }
+    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'close' }] },
+    ...(process.platform !== 'darwin' && updates ? [{ role: 'help', submenu: [updates.menuItem()] }] : [])
   ]));
   // Load the UI immediately; device discovery must not hold the window hostage.
   if (devUrl) await window.loadURL(devUrl);
