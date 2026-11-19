@@ -199,7 +199,7 @@ if (!new RegExp(`^## ${v.replace(/\./g, '\\.')}$`, 'm').test(c)) {
 }
 JS
   bump_check || die "the bump is incomplete (above)"
-  changed="$(git diff --name-only | sort | tr '\n' ' ')"
+  changed="$(git diff --name-only | LC_ALL=C sort | tr '\n' ' ')"
   [ "$changed" = "CHANGELOG.md README.md SETUP.md package-lock.json package.json " ] || die "the bump changed [$changed]"
   MSG="Ghost $VERSION: release"$'\n\n'"Version $VERSION in package.json, package-lock.json, README.md, SETUP.md and CHANGELOG.md (scripts/publik-release.sh)."
   [ -n "${PUBLIK_RELEASE_TRAILER:-}" ] && MSG="$MSG"$'\n\n'"$PUBLIK_RELEASE_TRAILER"
