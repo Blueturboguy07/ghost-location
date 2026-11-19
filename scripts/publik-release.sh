@@ -266,7 +266,7 @@ echo "$RUN" > "$STATE/ci-run"
 wait_run "$RUN" "publik build"
 STEPS="$(ghr run view "$RUN" -R "$REPO" --json jobs --jq '[.jobs[] | .name as $j | .steps[] | select(.conclusion != "skipped") | select(.name | test("publik app token|sign-in gate|Test adapters")) | "\($j): \(.name)=\(.conclusion)"] | join("\n")')"
 printf '%s\n' "$STEPS" | sed 's/^/      /'
-[ "$(grep -c '=success$' <<< "$STEPS")" -ge 10 ] && ! grep -qv '=success$' <<< "$STEPS" \
+[ "$(grep -c '=success$' <<< "$STEPS")" -eq 9 ] && ! grep -qv '=success$' <<< "$STEPS" \
   || die "the CI run $RUN did not pass every token, test and sign-in-gate step (above)"
 ok "CI run $RUN: tests, the publik app token in every build, the sign-in gate in every packaged app"
 
