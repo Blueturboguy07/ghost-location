@@ -15,8 +15,6 @@
 name: Live update proof
 
 on:
-  push:
-    branches: [live-proof] # TEMPORARY, removed before the merge
   workflow_dispatch:
     inputs:
       from_tag:
@@ -55,8 +53,8 @@ jobs:
         run: sw_vers; uname -m; spctl --status || true; csrutil status || true
       - name: Live update proof
         env:
-          FROM_TAG: ${{ inputs.from_tag || 'v0.1.10' }}
-          EXPECT: ${{ inputs.expect_version || '0.1.10' }}
+          FROM_TAG: ${{ inputs.from_tag }}
+          EXPECT: ${{ inputs.expect_version }}
           ANSWER: ${{ matrix.answer }}
         run: node .github/scripts/live-update-proof.cjs --from-tag "$FROM_TAG" --expect "$EXPECT" --answer "$ANSWER" --repo "$GITHUB_REPOSITORY" --out live-proof
       - uses: actions/upload-artifact@v4
@@ -84,8 +82,8 @@ jobs:
         with: { node-version: 22 }
       - name: Live update proof
         env:
-          FROM_TAG: ${{ inputs.from_tag || 'v0.1.10' }}
-          EXPECT: ${{ inputs.expect_version || '0.1.10' }}
+          FROM_TAG: ${{ inputs.from_tag }}
+          EXPECT: ${{ inputs.expect_version }}
           ANSWER: ${{ matrix.answer }}
         run: node .github/scripts/live-update-proof.cjs --from-tag "$FROM_TAG" --expect "$EXPECT" --answer "$ANSWER" --repo "$GITHUB_REPOSITORY" --out live-proof
       - uses: actions/upload-artifact@v4
