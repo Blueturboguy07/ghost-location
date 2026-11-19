@@ -5,7 +5,7 @@ place, drop a pin, or enter coordinates, then explicitly apply it to your select
 phone. Windows and macOS share one interface and use the appropriate iPhone or
 Android adapter.
 
-Current version: **0.1.9**. See [CHANGELOG.md](CHANGELOG.md) for the sign-in, onboarding,
+Current version: **0.1.10**. See [CHANGELOG.md](CHANGELOG.md) for the self-updater, sign-in, onboarding,
 interface, Android cleanup, Windows packaging, recovery-record, and reconnection changes.
 
 ![Ghost following an example road route in Chicago](docs/images/ghost-route.png)
@@ -14,7 +14,7 @@ interface, Android cleanup, Windows packaging, recovery-record, and reconnection
 
 ## Download and install
 
-Get [Ghost 0.1.9 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.9).
+Get [Ghost 0.1.10 for Mac or Windows](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.10).
 Follow the [setup guide](SETUP.md) for Mac → iPhone, Windows → iPhone, Mac → Android, or Windows → Android, or use [Publik's guided install](https://publikhq.com/ghost/install).
 
 The downloads include the phone runtimes. No programming tools or Ghost account are needed. Ghost opens with

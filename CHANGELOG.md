@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.10
+
+- Ghost updates itself on macOS (Apple chip and Intel) and Windows. It checks publik's signed update feed at launch, every 24 hours and from **Check for Updates…** (macOS: the Ghost menu). It verifies the feed signature and the sha512 of the download before it installs anything, then asks "Restart now?" or **Later**. Ghost never restarts by itself. `PUBLIK_UPDATES=0` turns the automatic checks off. See [docs/updates.md](docs/updates.md).
+- Ghost 0.1.9 and older have no updater: install 0.1.10 by hand one time. Later versions install themselves.
+- No other change to the app.
+
 ## 0.1.9
 
 - Ghost opens with Sign in with publik. The sign-in window comes first; the setup wizard, the phone scan and the macOS Local Network prompt start only after you sign in. Ghost uses no AI, so there is no plan step. A run from source skips the sign-in.

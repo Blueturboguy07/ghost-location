@@ -4,13 +4,13 @@ Ghost runs on your computer and sends simulated locations to a phone over a USB 
 
 ## Download and open
 
-Download **Ghost 0.1.9** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.9) or use the [Publik installation guide](https://publikhq.com/ghost/install).
+Download **Ghost 0.1.10** from [GitHub Releases](https://github.com/Blueturboguy07/ghost-location/releases/tag/v0.1.10) or use the [Publik installation guide](https://publikhq.com/ghost/install).
 
 | Your computer | Download |
 | --- | --- |
-| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.9-mac-arm64.dmg` |
-| Mac with an Intel processor | `Ghost-0.1.9-mac-x64.dmg` |
-| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.9-win-x64.exe` |
+| Mac with an Apple chip (M1 or newer) | `Ghost-0.1.10-mac-arm64.dmg` |
+| Mac with an Intel processor | `Ghost-0.1.10-mac-x64.dmg` |
+| Windows PC with an Intel/AMD 64-bit processor | `Ghost-0.1.10-win-x64.exe` |
 
 On Mac, **Apple menu → About This Mac** identifies the chip. On Windows, look at **Settings → System → About → System type**. Windows ARM and Linux are not release targets. Native builds are checked on macOS 15 and Windows Server 2025; other OS versions have not been rehearsed.
 
