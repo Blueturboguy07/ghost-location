@@ -127,6 +127,10 @@ jobs:
           if (-not (Test-Path $exe)) { $exe = Join-Path $env:LOCALAPPDATA 'Programs\Ghost\Ghost.exe' }
           if (-not (Test-Path $exe)) { throw 'The silent install did not produce Ghost.exe.' }
           Write-Host "Installed: $exe"
+          # The record that scripts/publik-release.sh reads: which installer CI installed, and the fingerprint
+          # (never the token) of the publik app token in the installed app.
+          node scripts/publik-release-check.cjs win-token (Join-Path (Split-Path $exe) 'resources\app.asar') $installer --out release\Ghost-win-x64-token.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node .github/scripts/publik-self-test.cjs ghost $exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node .github/scripts/publik-telemetry-smoke.mjs $exe
@@ -142,7 +146,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/Ghost-win-x64-token.json
 
   # Run by hand with a tag: the Windows installer of this run goes on that release, then the signed
   # update feed. latest-mac.yml follows once the signed Mac zips are on the release ("Update feed").
