@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.11
+
+No change in the app. Ghost 0.1.11 is the same app as 0.1.10.
+
+- This is the first version that reaches you through the self-updater.
+- It is the first release made with one command (`scripts/publik-release.sh`).
+
 ## 0.1.10
 
 - Ghost updates itself on macOS (Apple chip and Intel) and Windows. It checks publik's signed update feed at launch, every 24 hours and from **Check for Updates…** (macOS: the Ghost menu). It verifies the feed signature and the sha512 of the download before it installs anything, then asks "Restart now?" or **Later**. Ghost never restarts by itself. `PUBLIK_UPDATES=0` turns the automatic checks off. See [docs/updates.md](docs/updates.md).
