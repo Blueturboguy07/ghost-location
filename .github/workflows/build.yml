@@ -103,18 +103,6 @@ jobs:
             sidecar/build/**/warn-ghost-ios.txt
             release/builder-effective-config.yaml
 
-  # A v* tag: the Windows installer of this run goes on the tag's release (a draft is made if the tag has
-  # none; a release that already has an .exe keeps it), then the signed update feed (update-feed.yml):
-  # latest.yml now, latest-mac.yml once the signed Mac zips are on the release (run "Update feed" again).
-  # The Mac files of this workflow are unsigned and are never put on the release.
-  release:
-    name: Release files and update feed
-    needs: package
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-updtest') }}
-    permissions:
-      contents: write
-    uses: ./.github/workflows/update-feed.yml
-    with:
-      tag: ${{ github.ref_name }}
-      windows-artifact: Ghost-win32-x64-${{ github.sha }}
-    secrets: inherit
+  # No release job: scripts/publik-release.sh makes a release (docs/updates.md, Cut a release). It takes the
+  # Windows installer from publik-build.yml, which builds with the publik app token. This workflow builds
+  # without the token, so its files never go on a release, and a pushed tag changes no release.

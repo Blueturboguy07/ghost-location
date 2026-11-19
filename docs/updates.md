@@ -98,28 +98,32 @@ default; do not replace it with `-t`.
 
 ## Cut a release
 
-1. Set the new version in `package.json`. Commit and push the release branch.
-2. Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z`. `build.yml` builds the three targets. Its
-   `release` job then puts the Windows installer on the tag's release (it makes a DRAFT release if the tag
-   has none; an `.exe` already on the release is kept) and runs `update-feed.yml`, which adds `latest.yml`
-   and its `.sig`. (Or run **Publik build** by hand with the tag: it does the same with its own Windows
-   installer.) CI never publishes a release and never puts its unsigned Mac files on it.
-3. On the maintainer's Mac: sign, notarize and staple each `Ghost.app` (arm64 and x64) with the Developer ID,
-   then make each zip FROM THE STAPLED APP with the release name:
-   `ditto -c -k --sequesterRsrc --keepParent Ghost.app Ghost-X.Y.Z-mac-arm64.zip` (and `-mac-x64.zip`), and
-   the dmgs. Upload them: `gh release upload vX.Y.Z Ghost-X.Y.Z-mac-*.zip Ghost-X.Y.Z-mac-*.dmg`.
-4. Make the Mac feed: run **Actions › Update feed** with the tag (or
-   `gh workflow run update-feed.yml -f tag=vX.Y.Z`). It adds `latest-mac.yml` and its `.sig`. It adds only
-   missing feed files. Use **force** after you replace an installer file.
-5. Check that the release holds the four feed files, then let publik scan the draft and publish it.
-
-The update key is needed only by `update-feed.yml`: it reads the repo secrets `PUBLIK_UPDATE_KEY` and
-`PUBLIK_UPDATE_KEY_PASSWORD`. Without CI, run the same script on a Mac that has the key in its keychain:
+One command, on the maintainer's Mac (it holds the Developer ID certificate, the notarytool profile
+`publik` and the update key in its keychain):
 
 ```sh
-PUBLIK_UPDATE_KEY="$(security find-generic-password -s publik-update-key -a mann-private -w)" \
-PUBLIK_UPDATE_KEY_PASSWORD="$(security find-generic-password -s publik-update-key -a mann-password -w)" \
-node scripts/publik-update-feed.cjs release --tag vX.Y.Z --app ghost --repo Blueturboguy07/ghost-location
+scripts/publik-release.sh X.Y.Z --notes-file notes.md
+```
+
+The script does every step and stops at the first failed check. Run it again to resume.
+
+1. Checks the branch, the version and the tag. It bumps the version in every file if needed.
+2. Runs `publik-build.yml` in CI: the unsigned `Ghost.app` (arm64, x64) and the Windows installer, all with
+   the publik app token.
+3. Makes a DRAFT release.
+4. Signs each `Ghost.app` with the Developer ID, notarizes and staples it, makes the update zip from the
+   stapled app, then the dmg.
+5. Takes the Windows installer from the same CI run.
+6. Writes `SHA256SUMS.txt`, `latest.yml` and `latest-mac.yml` and signs the feed with the update key.
+7. Downloads every file back and verifies it.
+8. Publishes the release.
+
+`build.yml` has no release job. A pushed tag changes no release.
+
+To prove an update on real runners after publik took the release in (10:00 UTC each day):
+
+```sh
+gh workflow run live-update-proof.yml -f from_tag=vOLD -f expect_version=NEW
 ```
 
 ## Roll back
