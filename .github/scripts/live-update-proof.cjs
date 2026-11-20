@@ -575,7 +575,7 @@ end timeout`);
     const zipName = `${APP}-${EXPECT}-mac-${MAC_ARCH}.zip`;
     const want = `https://github.com/${REPO}/releases/download/v${EXPECT}/${zipName}`;
     check(`the app found ${EXPECT} in the live feed and downloaded the update zip from GitHub (its log)`,
-      s1 && s1.found && s1.found.version === EXPECT && s1.found.urls[0] === want && s1.downloaded && s1.downloaded.version === EXPECT && PENDING_RE.test(s1.downloaded.file),
+      s1 && s1.found && s1.found.version === EXPECT && s1.found.urls.includes(want) && s1.downloaded && s1.downloaded.version === EXPECT && PENDING_RE.test(s1.downloaded.file) && s1.downloaded.file.endsWith(zipName),
       s1 && { found: s1.found, downloading: s1.downloading, downloaded: s1.downloaded, error: s1.error });
     const question = await waitFor('the question "Restart now?"', () => {
       const d = uiDump(APP);
