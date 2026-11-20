@@ -2,7 +2,9 @@
 // tests/publik.test.mjs. It prints one JSON line per event on stdout.
 //   GATE_PRESS: the buttons to press, in order (for example "sign_in"); then it waits.
 //   GATE_EXIT_ON: a screen id; the driver exits when that screen shows.
+//   GATE_MODULE: another copy of the module to run (a test copy with USES_AI = true).
 import { writeSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 // Plain Node on Windows can stop with a libuv assertion (exit code 3221226505) when process.exit()
 // runs while a fetch socket still closes. Electron, where the module runs in Ghost, does not have
@@ -10,7 +12,7 @@ import { writeSync } from 'node:fs';
 // exit code and the process ends by itself when nothing is left to run.
 if (process.platform === 'win32') process.exit = code => { process.exitCode = code ?? 0; };
 
-const { ensureSignedIn } = await import('../../electron/publik.mjs');
+const { ensureSignedIn } = await import(process.env.GATE_MODULE ? pathToFileURL(process.env.GATE_MODULE).href : '../../electron/publik.mjs');
 const press = String(process.env.GATE_PRESS || '').split(',').filter(Boolean);
 // writeSync: a pipe on macOS and Windows is written later, and process.exit() would drop the line.
 const out = value => writeSync(1, `${JSON.stringify(value)}\n`);

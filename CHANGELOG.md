@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12
+
+After you sign in with publik, Ghost opens at once. Ghost uses no AI, so it never asks you to get a plan.
+
+- No change in what you see: Ghost 0.1.11 also opened at once after the sign-in. This release updates Ghost's copy of the publik sign-in module.
+
 ## 0.1.11
 
 No change in the app. Ghost 0.1.11 is the same app as 0.1.10.

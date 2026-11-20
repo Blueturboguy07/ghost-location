@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,12 +44,24 @@ function fakePublik({ claimFrom = 1 } = {}) {
   return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve({ server, requests, origin: `http://127.0.0.1:${server.address().port}` })));
 }
 
-function runDriver(origin, extraEnv = {}) {
+/** The module's credential file (<publik dir>/apps/ghost.json) under a test home. */
+function credentialFile(home) {
+  const base = process.platform === 'darwin' ? path.join(home, 'Library', 'Application Support')
+    : process.platform === 'win32' ? path.join(home, 'AppData', 'Local') : path.join(home, '.config');
+  return path.join(base, 'publik', 'apps', 'ghost.json');
+}
+
+/** credential: written to the credential file before the run. The result has `stored`: the file after the run. */
+function runDriver(origin, extraEnv = {}, { credential = null } = {}) {
   const home = mkdtempSync(path.join(tmpdir(), 'ghost-publik-test-'));
   const env = { ...process.env, PUBLIK_ORIGIN: origin, PUBLIK_APP_TOKEN: FAKE_APP_TOKEN, PUBLIK_TELEMETRY_DEBUG: '1', HOME: home,
     LOCALAPPDATA: path.join(home, 'AppData', 'Local'), XDG_CONFIG_HOME: path.join(home, '.config'), ...extraEnv };
-  for (const name of ['DO_NOT_TRACK', 'PUBLIK_TELEMETRY', 'PUBLIK_TELEMETRY_URL', 'PUBLIK_API_KEY', 'PUBLIK_SELF_TEST', 'ELECTRON_RUN_AS_NODE']) {
+  for (const name of ['DO_NOT_TRACK', 'PUBLIK_TELEMETRY', 'PUBLIK_TELEMETRY_URL', 'PUBLIK_API_KEY', 'PUBLIK_SELF_TEST', 'ELECTRON_RUN_AS_NODE', 'GATE_MODULE']) {
     if (!(name in extraEnv)) delete env[name];
+  }
+  if (credential) {
+    mkdirSync(path.dirname(credentialFile(home)), { recursive: true });
+    writeFileSync(credentialFile(home), JSON.stringify(credential));
   }
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [driver], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -60,9 +72,11 @@ function runDriver(origin, extraEnv = {}) {
     child.on('error', reject);
     child.on('exit', code => {
       clearTimeout(timer);
+      let stored = null;
+      try { stored = JSON.parse(readFileSync(credentialFile(home), 'utf8')); } catch {}
       try { rmSync(home, { recursive: true, force: true }); } catch {}
       const events = stdout.split(/\r?\n/).filter(line => line.startsWith('{')).map(line => JSON.parse(line));
-      resolve({ code, stdout, stderr, events, screens: events.filter(e => e.screen).map(e => e.screen), result: events.find(e => e.result)?.result ?? null });
+      resolve({ code, stdout, stderr, events, stored, screens: events.filter(e => e.screen).map(e => e.screen), result: events.find(e => e.result)?.result ?? null });
     });
   });
 }
@@ -127,8 +141,68 @@ test('signed in: no screen, and DO_NOT_TRACK=1 sends no usage count', async () =
     assert.equal(run.code, 0, run.stderr);
     assert.deepEqual(run.screens, []);
     assert.deepEqual(run.result, { claim_state: 'claimed', choice: null, key: 'pk_' });
+    assert.equal(run.stored?.choice, null, 'Ghost uses no AI: it stores no choice');
     assert.equal(of(fake.requests, 'POST', '/api/v1/telemetry').length, 0);
     assert.match(run.stderr, /publik-telemetry: app_opened -> off \(opt-out\)/);
+  } finally { fake.server.close(); }
+});
+
+/** Runs fn(file) with a copy of the module that has USES_AI = true (an app that calls a model): the plan path of the gate. */
+async function withAiCopy(fn) {
+  const code = readFileSync(moduleFile, 'utf8');
+  assert.ok(code.includes('export const USES_AI = false;'));
+  const dir = mkdtempSync(path.join(tmpdir(), 'ghost-publik-ai-'));
+  try {
+    const file = path.join(dir, 'publik.mjs');
+    writeFileSync(file, code.replace('export const USES_AI = false;', 'export const USES_AI = true;'));
+    await fn(file);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('no pay screen at start (USES_AI = true): sign in, then straight in with the choice publik', async () => {
+  const fake = await fakePublik({ claimFrom: 3 });
+  try {
+    await withAiCopy(async file => {
+      const run = await runDriver(fake.origin, { GATE_MODULE: file, GATE_PRESS: 'sign_in', DO_NOT_TRACK: '1' });
+      assert.equal(run.code, 0, run.stderr);
+      assert.deepEqual(run.screens.map(s => s.id), ['sign_in', 'sign_in'], 'only Sign in with publik: no "Choose how to pay for AI"');
+      assert.deepEqual(run.events.filter(e => e.openUrl).map(e => e.openUrl), [`${fake.origin}/claim/test`], 'no plan page opens');
+      assert.deepEqual(run.result, { claim_state: 'claimed', choice: 'publik', key: 'pk_' });
+      assert.equal(run.stored?.choice, 'publik', 'the gate stores the choice publik');
+    });
+  } finally { fake.server.close(); }
+});
+
+test('no pay screen at start (USES_AI = true): signed in with no plan and no balance, no screen', async () => {
+  const fake = await fakePublik({ claimFrom: 1 });
+  try {
+    await withAiCopy(async file => {
+      const run = await runDriver(fake.origin, { GATE_MODULE: file, DO_NOT_TRACK: '1' });
+      assert.equal(run.code, 0, run.stderr);
+      assert.deepEqual(run.screens, []);
+      assert.deepEqual(run.result, { claim_state: 'claimed', choice: 'publik', key: 'pk_' });
+      assert.equal(run.stored?.choice, 'publik');
+    });
+  } finally { fake.server.close(); }
+});
+
+test('a stored own_key choice is kept', async () => {
+  const fake = await fakePublik({ claimFrom: 1 });
+  const credential = { key: KEY, base_url: `${fake.origin}/api/v1`, install_id: '0b0b0b0b-0000-4000-8000-000000000000', claim_url: null, choice: 'own_key' };
+  try {
+    await withAiCopy(async file => {
+      const run = await runDriver(fake.origin, { GATE_MODULE: file, DO_NOT_TRACK: '1' }, { credential });
+      assert.equal(run.code, 0, run.stderr);
+      assert.deepEqual(run.screens, []);
+      assert.deepEqual(run.result, { claim_state: 'claimed', choice: 'own_key', key: 'pk_' });
+      assert.deepEqual(run.stored, credential);
+    });
+    const run = await runDriver(fake.origin, { DO_NOT_TRACK: '1' }, { credential }); // Ghost's module: USES_AI = false
+    assert.equal(run.code, 0, run.stderr);
+    assert.deepEqual(run.screens, []);
+    assert.deepEqual(run.result, { claim_state: 'claimed', choice: null, key: 'pk_' });
+    assert.deepEqual(run.stored, credential, 'Ghost changes no stored choice');
+    assert.equal(of(fake.requests, 'POST', '/api/v1/installs').length, 0, 'the stored key is used');
   } finally { fake.server.close(); }
 });
 
